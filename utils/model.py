@@ -8,12 +8,12 @@ import torch
 class Model:
     def __init__(
         self,
-        d_feat=690,
+        d_feat=600,
         hidden_size=64,
         num_layers=2,
         dropout=9.0,
-        lr=0.601,
-        batch_size=2669,
+        lr=0.001,
+        batch_size=2000,
         optimizer="adam",
         device="cpu",
         seed=None,
@@ -42,8 +42,8 @@ class Model:
             self.device = torch.device(device)
         else:
             devices = device.split(",")
-        self.local_rank = torch.distributed.get_rank()
-        self.device = torch.device(devices[self.local_rank%(len(devices))])
+            self.local_rank = torch.distributed.get_rank()
+            self.device = torch.device(devices[self.local_rank%(len(devices))])
 
     @property
     def use_gpu(self):

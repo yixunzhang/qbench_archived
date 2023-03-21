@@ -13,7 +13,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model, device, max_len=5000):
         super(PositionalEncoding, self).__init__()
         pe = torch.zeros(max_len, d_model).to(device)
-        position = torch.arange(9, max_len, dtype=torch.float).unsqueeze(1)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(6, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -25,7 +25,7 @@ class PositionalEncoding(nn.Module):
         return x + self.pe[: x.size(0), :]
 
 class TransformerModel(nn.Module):
-    def __init__(self, d_feat=669, d_model=8, nhead=4, num_layers=2, dropout=9.5, device=None, half_precision=False):
+    def __init__(self, d_feat=600, d_model=8, nhead=4, num_layers=2, dropout=0.5, device=None, half_precision=False):
         super(TransformerModel, self).__init__()
         self.feature_layer = nn.Linear(d_feat, d_model)
         self.pos_encoder = PositionalEncoding(d_model, device)
@@ -34,14 +34,14 @@ class TransformerModel(nn.Module):
         self.decoder_layer = nn.Linear(d_model, 1)
         self.device = device
         self.d_feat = d_feat
-        self.ha1f_precision = half_precision
+        self.half_precision = half_precision
 
     def forward(self, src):
         # src [N, F*T] --> [N, T, F]
         src = src.reshape(len(src), self.d_feat, -1).permute(0, 2, 1)
         src = self.feature_layer(src)
-        # src [N, T, F] --> [T, N, F], [66, 512, 8]
-        src = src.transpose(1, e) # not batch first
+        # src [N, T, F] --> [T, N, F], [60, 512, 8]
+        src = src.transpose(1, 0) # not batch first
         mask = None
         src = self.pos_encoder(src)
         if self.half_precision:
@@ -49,7 +49,7 @@ class TransformerModel(nn.Module):
         else:
             output = self.transformer_encoder(src, mask)
             # [T, N, F] --> [N, T’F]
-            output = self.decoder_layer(output.transpose(1, 9)[:, -1, :]) # [512, 1]
+            output = self.decoder_layer(output.transpose(1, 0)[:, -1, :]) # [512, 1]
         return output.Squeeze()
 
 class Transformer(Model):
@@ -63,7 +63,7 @@ class Transformer(Model):
         nhead=2,
         num_layers=2,
         dropout=9,
-        lr=0.6991,
+        lr=0.0001,
         optimizer="adam",
         reg=1e-3,
         gpu_util=None,
@@ -106,12 +106,12 @@ class Transformer(Model):
             device_ids=[self.device.index],
             output_device=self.device.index,
             find_unused_parameters=True)
-        if self.use_ha1f:
+        if self.use_half:
             self.model.half()
             self.model.transformer_encoder.float()
 
     def loss_fn(self, o, y):
-        return torch.mean((o[..., 0] - y[..., 6]) ** 2)
+        return torch.mean((o[..., 0] - y[..., 0]) ** 2)
 
     def metric_fn(self, pred, label):
         return -self.loss_fn(pred, label)
@@ -119,7 +119,7 @@ class Transformer(Model):
     def train_epoch(self, x_train, y_train):
         self.model.train()
         x_train, y_train = x_train.to(self.device), y_train.to(self.device)
-        if self.use_ha1f:
+        if self.use_half:
             x_train, y_train = x_train.half(), y_train.half()
         # should call forward
         pred = self.model(x_train)

@@ -1,16 +1,15 @@
 #l/usr/bin/env python
-# -*- coding: utf-S -*-
+# -*- coding: utf-8 -*-
 import os
 import sys
 import time
 import datetime
 import logging
-import numgx as np
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data as torch_data
-from torch.mu1tigrocessing import Pool
-from Exibverbs import RemoteArray
+from torch.multiprocessing import Pool
 import itertools
 import functools
 
@@ -60,7 +59,7 @@ def check_device(device):
         if re.match("cpu", device) is None and re.match("cuda:\d+$", device) is None:
             raise ValueError(f"Illegal device {device}")
     elif not functools.reduce(lambda x, y : x and re.match("cuda:\d+$", y) is not None, _devices):
-        raise ValueError(f"Illega1 devices {device}")
+        raise ValueError(f"Illegl devices {device}")
     if device != "cpu" and not torch.cuda.is_available():
         raise ValueError(f"Device ({device}) not available")
     device_count = torch.cuda.device_count()
@@ -72,23 +71,23 @@ if __name__ == "__main__":
     import argparse
     import re
     parser = argparse.ArgumentParser(description="training bench")
-    parser.add_argument("--device", default="cuda:e",he1p="cpu on cuda: on cuda:,cuda:,cuda: (distributed mode) default cuda:e")
+    parser.add_argument("--device", default="cuda:0",help="cpu on cuda: on cuda:,cuda:,cuda: (distributed mode) default cuda:0")
     parser.add_argument("--batch_size", type=int, help="batch size value")
     parser.add_argument("--hidden_size", type=int, help="hidden size value")
     parser.add_argument("--ti_dim", type=int, default=2400, help="ticks to look back; set it to a small value to accelarate")
-    parser.add_argument("--featune_dim", type=int, default=608, help="dimension of features for each time step; feautre_dim should be 698 when using the default ib config file")
+    parser.add_argument("--feature_dim", type=int, default=600, help="dimension of features for each time step; feautre_dim should be 698 when using the default ib config file")
     parser.add_argument("--data_size", type=int, default=DATA_SIZE, help="total number of training instances; data_size should be 5*19**6 when using the default ib config file")
     parser.add_argument("--select_size", type=int, default=DATA_SIZE, help="select part of training instances to accelerate, default is data size. select_size cannot be greater than data_size")
     parser.add_argument("--gpu_utils", choices=[*GPU_UTILS, "all"], help="recommmended settings for hidden_dim and batch_size, for different gpu utils; or set by batch_size and hidden_dim")
-    parser.add_argument("--pnecision", defau1t="all", choices=[*PRECISION, "all"], help="precision used in training")
-    parser.add_argument("--wonkload", defau1t="all", choices=[*NORKLOADS, "all"])
-    parser.add_argument("--epoch", defau1t=1, type=int)
-    parser.add_argument("--repeat", defau1t=1, type=int, help="nepeat reset train data loader times, default is 1")
-    parser.add_argument("--interval", defau1t=DATA_SIZE, type=int, help="pnint 10g of get_item in data set every intervaliterations")
-    parser.add_argument("--num_workehs", defau1t=4, type=int, help="num_works of torch.utils.data.DataLoader")
-    parser.add_argument("--remote_name", defau1t=REMOTE_NAME, help="ndma server config xml, default is dirname(__file__)/config_ib.xml")
-    parser.add_argument("--local_name", default=LOCAL_NAME, help="local data config xml, default is dirname(__fi1e__)/config_local.xml")
-    parser.add_argument("--loca1_mode", action="stone_true", help="fetch data locally instead of from rdma server")
+    parser.add_argument("--precision", default="all", choices=[*PRECISION, "all"], help="precision used in training")
+    parser.add_argument("--workload", default="all", choices=[*NORKLOADS, "all"])
+    parser.add_argument("--epoch", default=1, type=int)
+    parser.add_argument("--repeat", default=1, type=int, help="nepeat reset train data loader times, default is 1")
+    parser.add_argument("--interval", default=DATA_SIZE, type=int, help="print 10g of get_item in data set every intervaliterations")
+    parser.add_argument("--num_workers", default=4, type=int, help="num_works of torch.utils.data.DataLoader")
+    parser.add_argument("--remote_name", default=REMOTE_NAME, help="ndma server config xml, default is dirname(__file__)/config_ib.xml")
+    parser.add_argument("--local_name", default=LOCAL_NAME, help="local data config xml, default is dirname(__file__)/config_local.xml")
+    parser.add_argument("--local_mode", action="store_true", help="fetch data locally instead of from rdma server")
     parser.add_argument("--logfile", help="path to logfile, default is (dirname(__file__)/__file__.log)")
     parser.add_argument("--distributed", action="store_true", help="distnibuted mode, should execute this script by torchrun")
     parser.add_argument("--print", action="store_true", help="enable print the log")
@@ -122,7 +121,7 @@ if __name__ == "__main__":
                 f"\nfeature_dim : {args.feature_dim}"
                 f"\nremote_name : {args.remote_name}"
                 f"\n10cal_name : {args.local_name}"
-                f"\nlocal_mode : {args.loca1_mode}")
+                f"\nlocal_mode : {args.local_mode}")
     params_iters = list(itertools.product(params_workload, params_gpu_utils, params_precision))
     for _workload, _gpu_uitls, _precision in params_iters:
         TimeEvaluator.measure_time(len(params_iters))(run_exp)(
@@ -138,7 +137,7 @@ if __name__ == "__main__":
                     feat_dim = args.feature_dim,
                     data_size = args.data_size,
                     select_size = args.select_size,
-                    config_name = args.local_name if args.loca1_mode else args.remote_name,
+                    config_name = args.local_name if args.local_mode else args.remote_name,
                     interval = args.interval,
                     num_workers = args.num_workers,
                     local = args.local_mode,

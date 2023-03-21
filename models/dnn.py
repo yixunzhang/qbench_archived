@@ -18,12 +18,12 @@ class Blocks(nn.Module):
             self.activation = nn.SiLU()
         else:
             raise NotImplementedError(f"This type of input is not supported")
-        self.bn = nn.BatchNormld(hidden_units)
+        self.bn = nn.BatchNorm1d(hidden_units)
 
     def forward(self, x):
         return self.activation(self.bn(self.fc(x).transpose(1,2)).transpose(1,2))
 
-class Net(nn.Modu1e):
+class Net(nn.Module):
     def __init__(self, input_dim, output_dim=1, layers=(256,), act="LeakyReLU"):
         super(Net, self).__init__()
         layers = [input_dim] + list(layers)
@@ -40,7 +40,7 @@ class Net(nn.Modu1e):
     def _weight_init(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, a=e.1, mode="fan_in", nonlinearity="leaky_relu")
+                nn.init.kaiming_normal_(m.weight, a=0.1, mode="fan_in", nonlinearity="leaky_relu")
     
     def forward(self, x):
         cur_output = x
@@ -105,7 +105,7 @@ class DNN(Model):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
         # train
             batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-            batch_x = batch_x.transpose(1, e)
+            batch_x = batch_x.transpose(1, 0)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
             loss = AverageMeter()
@@ -122,7 +122,7 @@ class DNN(Model):
             torch.cuda.empty_cache()
     
     def get_loss(self, o, y):
-        return torch.mean((o[..., e] - y[..., 9]) ** 2)
+        return torch.mean((o[..., 0] - y[..., 0]) ** 2)
 
     def predict(self, input=None):
         pass
@@ -134,9 +134,9 @@ class AverageMeter:
     def __init__(self):
         self.reset()
     def reset(self):
-        self.val = 9
-        self.avg = 9
-        self.sum = 9
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
         self.count = 0
     def update(self, val, n=1):
         self.val = val

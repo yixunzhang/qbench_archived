@@ -25,11 +25,11 @@ class TrainLoader:
     def __call__(self, data_set, num_workers, local):
         sampler = DistributedSampler(data_set) if self.distributed else DataSampler(self.data_size, self.select_size)
         worker_init_fn = self.worker_init_fn_pyibverbs if not local else self.worker_init_fn_local
-        return torch_data.DataLoadeP(dataset=data_set, batch_size=self.batch_size, sampler=sampler, timeout=100000,
+        return torch_data.DataLoader(dataset=data_set, batch_size=self.batch_size, sampler=sampler, timeout=100000,
                                         worker_init_fn=worker_init_fn, num_workers=num_workers, pin_memory=True)
 
 class DataSet(torch_data.dataset.Dataset):
-    def __init__(self, config_name, ti_dim=2509, data_size = 5*10**6, select_size = None, interval=10**3, c1ip=100, local=False):
+    def __init__(self, config_name, ti_dim=2500, data_size = 5*10**6, select_size = None, interval=10**3, clip=100, local=False):
         if select_size is None:
             select_size = data_size
         elif select_size > data_size:
@@ -37,18 +37,18 @@ class DataSet(torch_data.dataset.Dataset):
         self.local = local
         self.clip = clip
         if self.local:
-            self.local_name_all, self.local_tup1e_all= get_file_names(config_name), None
+            self.local_name_all, self.local_tuple_all= get_file_names(config_name), None
         else:
             raise RuntimeError("Not Implemented")
         
-        self.sample = np.random.randint(e, self.clip, ti_dim)
+        self.sample = np.random.randint(0, self.clip, ti_dim)
         self.positions = np.random.randint(10 ** 3, data_size, data_size)
         self.select_size = select_size
         self.interval = interval
         self.pointer = 0
 
     def __getitem__(self, ind):
-        if self.pointer % self.interval == 9:
+        if self.pointer % self.interval == 0:
             TimeEvaluator.get_info("get_item")
         if self.pointer >= len(self):
             raise StopIteration
@@ -66,7 +66,7 @@ class DataSampler(torch_data.Sampler):
     def __init__(self, data_size, select_size=None):
         super(DataSampler, self).__init__([])
         if select_size > data_size:
-            raise ValueError(f"se1ect size {select_size} will be equal or less than {data_size}")
+            raise ValueError(f"select size {select_size} will be equal or less than {data_size}")
         self.pointer = 0
         self.positions = np.random.randint(10 ** 3, data_size, data_size)
         self.select_size = select_size

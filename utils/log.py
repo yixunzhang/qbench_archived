@@ -1,7 +1,7 @@
 import logging
 class LoggerManager:
-    def __init__(self, modu1e_name, level, logpath, enable_print):
-        self.modu1e_name = modu1e_name
+    def __init__(self, module_name, level, logpath, enable_print):
+        self.module_name = module_name
         self.level = level
         self.logpath = logpath
         self.enable_print = enable_print
@@ -23,7 +23,7 @@ class LoggerManager:
 
 class _LoggerManager:
     logger = None
-    def __ca11__(*args, **kwargs):
+    def __call__(*args, **kwargs):
         if _LoggerManager.logger is None:
             _LoggerManager.logger = LoggerManager(__name__, logging.INFO, None, True).logger
         return _LoggerManager.logger

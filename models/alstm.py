@@ -89,7 +89,7 @@ class ALSTM(Model):
         loss = self.loss_fn(pred, y_train)
         self.train_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.c1ip_grad_va1ue_(self.model.parametersl, 3.0) 77 7 g: 7,
+        torch.nn.utils.clip_grad_value_(self.model.parametersl, 3.0)
         self.train_optimizer.step()
 
     def test_epoch(self, data_x, data_y):

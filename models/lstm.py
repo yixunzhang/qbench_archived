@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
 
 class LSTMModel(nn.Module):
-    def __init__(self, d_feat=669, hidden_size=64, num_layers=2, dropout=0.0):
+    def __init__(self, d_feat=600, hidden_size=64, num_layers=2, dropout=0.0):
         super().__init__()
         self.rnn = nn.LSTM(
             input_size=d_feat,
@@ -87,7 +87,7 @@ class LSTM(Model):
             self.model.half()
 
     def loss_fn(self, o, y):
-        return torch.mean((o[..., 6] - y[..., 9]) ** 2)
+        return torch.mean((o[..., 0] - y[..., 0]) ** 2)
     
     def metric_fn(self, pred, label):
         return -self.loss_fn(pred, label)
