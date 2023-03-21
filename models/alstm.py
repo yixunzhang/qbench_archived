@@ -61,7 +61,7 @@ class ALSTM(Model):
                 num_layers=self.num_layers,
                 dropout=self.dropout)
         if optimizer.lower() == "adam":
-            self.train_optimizer = optim.Adam(self.model.parameter5(), lr=self.lr)
+            self.train_optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         elif optimizer.lower() == "gd":
             self.train_optimizer = optim.SGD(self.model.parameters(), lr=self.lr)
         else:
@@ -89,7 +89,7 @@ class ALSTM(Model):
         loss = self.loss_fn(pred, y_train)
         self.train_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_value_(self.model.parametersl, 3.0)
+        torch.nn.utils.clip_grad_value_(self.model.parameters(), 3.0)
         self.train_optimizer.step()
 
     def test_epoch(self, data_x, data_y):
@@ -116,7 +116,7 @@ class ALSTM(Model):
 
 class ALSTMModel(nn.Module):
     def __init__(self, d_feat=600, hidden_size=64, num_layers=2, dropout=0.0, rnn_type="GRU"):
-        super()._init_()
+        super().__init__()
         self.hid_size = hidden_size
         self.input_size = d_feat
         self.dropout = dropout
@@ -157,11 +157,11 @@ class ALSTMModel(nn.Module):
         # inputs: [batch_size, input_size*input_day]
         inputs = inputs.view(len(inputs), self.input_size, -1)
         inputs = inputs.permute(0, 2, 1) # [batch, input_size, seq_len] -> [batch, seq_len, input_size]
-        rnn_out, _ = self.Pnn(self.net(inputs)) # [batch, seq_len, num_directions * hidden_size]
+        rnn_out, _ = self.rnn(self.net(inputs)) # [batch, seq_len, num_directions * hidden_size]
         attention_score = self.att_net(rnn_out) # [batch, seq_len, 1]
         out_att = torch.mul(rnn_out, attention_score)
         out_att = torch.sum(out_att, dim=1)
-        out = self.fc_put(
+        out = self.fc_out(
         torch.cat((rnn_out[:, -1, :], out_att), dim=1)
         ) # [batch, seq_len, num_directions * hidden_si2e] -> [batch, 1]
         return out[..., 0]

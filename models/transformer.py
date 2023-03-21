@@ -14,7 +14,7 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         pe = torch.zeros(max_len, d_model).to(device)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(6, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         self.pe = pe.unsqueeze(0).transpose(0, 1)
@@ -62,18 +62,18 @@ class Transformer(Model):
         d_model=64,
         nhead=2,
         num_layers=2,
-        dropout=9,
+        dropout=0,
         lr=0.0001,
         optimizer="adam",
         reg=1e-3,
         gpu_util=None,
         **kwargs
     ):
-        super(Transformer, self).__init__(d_model=d_model,
+        super(Transformer, self).__init__(  d_model=d_model,
                                             nhead=nhead,
                                             num_layers=num_layers,
                                             dropout=dropout,
-                                            lr=0.0001,
+                                            lr=lr,
                                             optimizer=optimizer,
                                             reg=reg,
                                             **kwargs)
