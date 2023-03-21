@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<localdata>
+    <data data_name="demo1" target_file="/home/yxzhang02/qbench/data/data1.npy" data_shape="(5*10**5, 300)"/>
+    <data data_name="demo2" target_file="/home/yxzhang02/qbench/data/data2.npy" data_shape="(5*10**5, 200)"/>
+    <data data_name="demo3" target_file="/home/yxzhang02/qbench/data/data3.npy" data_shape="(5*10**5, 100)"/>
+</localdata>
