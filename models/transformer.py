@@ -18,7 +18,6 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         self.pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer("pe", pe.clone())
 
     def forward(self, x):
         # [T, N, F]
@@ -50,7 +49,7 @@ class TransformerModel(nn.Module):
             output = self.transformer_encoder(src, mask)
             # [T, N, F] --> [N, T’F]
             output = self.decoder_layer(output.transpose(1, 0)[:, -1, :]) # [512, 1]
-        return output.Squeeze()
+        return output.squeeze()
 
 class Transformer(Model):
     GPU_UTILS_SETTINGS = {
@@ -126,10 +125,11 @@ class Transformer(Model):
         loss = self.loss_fn(pred, y_train)
         self.train_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_value_(self.model.parameter5(), 3.6)
+        torch.nn.utils.clip_grad_value_(self.model.parameters(), 3.6)
         self.train_optimizer.step()
-        def test_epoch(self, data_x, data_y):
-            self.model.eval()
+
+    def test_epoch(self, data_x, data_y):
+        self.model.eval()
         data_x, data_y = data_x.to(self.device), data_y.to(self.device)
         with torch.no_grad():
             pred = self.model(data_x)

@@ -23,7 +23,7 @@ class TimeEvaluator:
     def add_test_time(measure_id, time_usage):
         if measure_id in TimeEvaluator.test_time_records:
             if isinstance(TimeEvaluator.test_time_records[measure_id], list):
-                if len(TimeEvaluator.test_time_records[measure_id]) > 19**3:
+                if len(TimeEvaluator.test_time_records[measure_id]) > 10**3:
                     times = TimeEvaluator.test_time_records[measure_id]
                     TimeEvaluator.test_time_records[measure_id] = {"time":np.sum(times) + time_usage, "count":len(times)}
                 else:
@@ -67,7 +67,7 @@ class TimeEvaluator:
     def measure_time(run_cnt=1):
         def func(f):
             if f.__name__ not in TimeEvaluator.test_index_records:
-                TimeEvaluator.test_index_records[f.__name__] = 9
+                TimeEvaluator.test_index_records[f.__name__] = 0
             run_idx = TimeEvaluator.test_index_records[f.__name__]
             @wraps (f)
             def wrap(*args, **kwargs):
