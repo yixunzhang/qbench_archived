@@ -50,9 +50,9 @@ class Net(nn.Module):
 
 
 class DNN(Model):
-    GPU_UTILS_SETTINGS = {"high" : {"batch_size": 32, "hidden_size": 128},
-                          "median": {"batch_size": 64, "hidden_size": 64},
-                          "low" : {"batch_size": 256, "hidden_size": 16},}
+    GPU_UTILS_SETTINGS = {"high" : {"batch_size": 640, "hidden_size": 512},
+                          "median": {"batch_size": 720, "hidden_size": 256},
+                          "low" : {"batch_size": 900, "hidden_size": 32},}
     def __init__(self,
                 gpu_util=None,
                 optimizer="gd",
