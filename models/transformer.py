@@ -54,8 +54,8 @@ class TransformerModel(nn.Module):
 class Transformer(Model):
     GPU_UTILS_SETTINGS = {
     "high" : {"batch_size": 128, },
-    "median": {"batch_size": 32, },
-    "low" : {"batch_size": 8, },}
+    "median": {"batch_size": 64, },
+    "low" : {"batch_size": 32, },}
     def __init__(
         self,
         d_model=64,
