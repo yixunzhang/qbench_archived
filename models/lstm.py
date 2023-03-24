@@ -30,9 +30,9 @@ class LSTMModel(nn.Module):
 
 class LSTM(Model):
     GPU_UTILS_SETTINGS = {
-        "high" : {"batch_size": 200, "hidden_size": 512},
-        "median": {"batch_size": 512, "hidden_size": 256},
-        "low" : {"batch_size": 1024, "hidden_size": 64},
+        "high" : {"batch_size": 64, "hidden_size": 512},
+        "median": {"batch_size": 256, "hidden_size": 256},
+        "low" : {"batch_size": 512, "hidden_size": 64},
     }
     def __init__(
         self,
