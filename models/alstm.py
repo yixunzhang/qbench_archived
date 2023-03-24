@@ -9,9 +9,9 @@ from utils.model import Model
 
 class ALSTM(Model):
     GPU_UTILS_SETTINGS = {
-    "high" : {"batch_size": 512, "hidden_size": 128},
-    "median": {"batch_size": 1024, "hidden_size": 64},
-    "low" : {"batch_size": 1600, "hidden_size": 32},
+    "high" : {"batch_size": 256, "hidden_size": 128},
+    "median": {"batch_size": 512, "hidden_size": 64},
+    "low" : {"batch_size": 1024, "hidden_size": 32},
     }
     def __init__(
         self,
