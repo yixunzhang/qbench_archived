@@ -12,7 +12,7 @@ class TimeEvaluator:
 
         def __enter__(self):
             self._time = perf_counter()
-            TimeEvaluator.add_test_time(self.measure_id, 0)
+            TimeEvaluator.add_test_time(self.measure_id, -1)
             return self
     
         def __exit__(self, type, value, traceback):
@@ -31,8 +31,8 @@ class TimeEvaluator:
             else: # dict
                 TimeEvaluator.test_time_records[measure_id]["time"] += time_usage
                 TimeEvaluator.test_time_records[measure_id]["count"] += 1
-        else:
-            TimeEvaluator.test_time_records[measure_id] = [time_usage]
+        elif time_usage < 0:
+            TimeEvaluator.test_time_records[measure_id] = []
 
     @staticmethod
     def get_info(measure_id = None):
