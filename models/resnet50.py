@@ -158,6 +158,7 @@ class ResNet50(Model):
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
             if batch_x.shape[0] != self.batch_size:
+                self.count_iter()
                 continue 
             # train
             if self.use_half:
