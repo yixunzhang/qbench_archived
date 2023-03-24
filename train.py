@@ -16,7 +16,7 @@ import functools
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models import DNN, ALSTM, LSTM, Transformer
+from models import DNN, ALSTM, LSTM, Transformer, ResNet50
 from utils.profiler import TimeEvaluator
 from utils.data import DataSet
 from utils.log import get_logger, init_log
@@ -28,6 +28,7 @@ NORKLOADS = {
         "ALSTM": ALSTM,
         "LSTM": LSTM,
         "Transformer": Transformer,
+        "ResNet50": ResNet50,
     }
 DEVICES = ["cpu", "gpu"]
 PRECISION = ["fp32", "fp16"]
