@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
+from utils.profiler import TimeEvaluator
 
 class ALSTM(Model):
     GPU_UTILS_SETTINGS = {
@@ -82,9 +83,6 @@ class ALSTM(Model):
 
     def train_epoch(self, x_train, y_train):
         self.model.train()
-        x_train, y_train = x_train.to(self.device), y_train.to(self.device)
-        if self.use_half:
-            x_train, y_train = x_train.half(), y_train.half()
         pred = self.model(x_train)
         loss = self.loss_fn(pred, y_train)
         self.train_optimizer.zero_grad()
@@ -94,7 +92,6 @@ class ALSTM(Model):
 
     def test_epoch(self, data_x, data_y):
         self.model.eval()
-        data_x, data_y = data_x.to(self.device), data_y.to(self.device)
         with torch.no_grad():
             pred = self.model(data_x)
             loss = self.loss_fn(pred, data_y)
@@ -102,11 +99,13 @@ class ALSTM(Model):
         return loss, score
 
     def fit(self):
-        for _, (batch_x, batch_y) in enumerate(self.train_loader):# train
+        for _, (batch_x, batch_y) in enumerate(self.train_loader):
+            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
-            self.train_epoch(batch_x, batch_y)
-            self.test_epoch(batch_x, batch_y)
+            with TimeEvaluator.time_context("alstm_train"):
+                self.train_epoch(batch_x, batch_y)
+                self.test_epoch(batch_x, batch_y)
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
