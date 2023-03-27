@@ -22,6 +22,8 @@ class TimeEvaluator:
     @staticmethod
     def add_test_time(measure_id, time_usage):
         if measure_id in TimeEvaluator.test_time_records:
+            if time_usage < 0:
+                return
             if isinstance(TimeEvaluator.test_time_records[measure_id], list):
                 if len(TimeEvaluator.test_time_records[measure_id]) > 10**3:
                     times = TimeEvaluator.test_time_records[measure_id]
@@ -46,6 +48,7 @@ class TimeEvaluator:
             if isinstance(test_times, list):
                 TimeEvaluator.logger.info(
                         f"[{test_name}] time_usage of {len(test_times)} test(s): "
+                        f"sum: {np.sum(test_times)}\t"
                         f"mean: {np.mean(test_times)}\t"
                         f"std: {np.std(test_times)}\t"
                         f"max: {np.max(test_times)}\t"
