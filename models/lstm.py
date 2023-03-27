@@ -4,9 +4,11 @@ import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
+from utils.profiler import TimeEvaluator
+
 
 class LSTMModel(nn.Module):
     def __init__(self, d_feat=600, hidden_size=64, num_layers=2, dropout=0.0):
@@ -93,7 +95,6 @@ class LSTM(Model):
         return -self.loss_fn(pred, label)
     
     def train_epoch(self, batch_x, batch_y):
-        batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
         self.model.train()
         pred = self.model(batch_x)
         loss = self.loss_fn(pred, batch_y)
@@ -103,7 +104,6 @@ class LSTM(Model):
         self.train_optimizer.step()
     
     def test_epoch(self, batch_x, batch_y):
-        batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
         self.model.eval()
         pred = self.model(batch_x)
         loss = self.loss_fn(pred, batch_y)
@@ -112,11 +112,13 @@ class LSTM(Model):
 
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
-            # train
+            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
-            self.train_epoch(batch_x, batch_y)
-            self.test_epoch(batch_x, batch_y)
+            # train
+            with TimeEvaluator.time_context("lstm_train"):
+                self.train_epoch(batch_x, batch_y)
+                self.test_epoch(batch_x, batch_y)
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
