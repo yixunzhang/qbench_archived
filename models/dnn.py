@@ -7,6 +7,7 @@ import torch.optim as optim
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
+from utils.profiler import TimeEvaluator
 
 class Blocks(nn.Module):
     def __init__(self, input_dim, hidden_units, act):
@@ -112,11 +113,12 @@ class DNN(Model):
             self.model.train()
             self.train_optimizer.zero_grad()
             # forward
-            preds = self.model(batch_x)
-            cur_loss = self.get_loss(preds, batch_y)
-            cur_loss.backward()
-            self.train_optimizer.step()
-            loss.update(cur_loss.item())
+            with TimeEvaluator.time_context("dnn_train"):
+                preds = self.model(batch_x)
+                cur_loss = self.get_loss(preds, batch_y)
+                cur_loss.backward()
+                self.train_optimizer.step()
+                loss.update(cur_loss.item())
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
