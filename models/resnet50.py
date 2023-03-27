@@ -6,7 +6,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.model import Model
-
+from utils.profiler import TimeEvaluator
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -41,10 +41,7 @@ class Bottleneck(nn.Module):
         #add identity
         x+=identity
         x=self.relu(x)
-
         return x
-
-
 
 class ResNet50Model(nn.Module):
     def __init__(self, layer_list=[3, 4, 6, 3], num_classes=100, num_channels=3):
@@ -102,9 +99,9 @@ class ResNet50Model(nn.Module):
 
 class ResNet50(Model):
     gpu_utils = {
-            "low":{"batch_size":8},
-            "median":{"batch_size":16},
-            "high":{"batch_size":32},}
+            "low":{"batch_size":32},
+            "median":{"batch_size":64},
+            "high":{"batch_size":128},}
     def __init__(self, gpu_util=None, **kwargs):
         super(ResNet50, self).__init__(**kwargs)
         if gpu_util is not None:
@@ -139,7 +136,6 @@ class ResNet50(Model):
         return -self.loss_fn(pred, label)
     
     def train_epoch(self, batch_x, batch_y):
-        batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
         self.model.train()
         pred = self.model(batch_x)
         loss = self.loss_fn(pred, batch_y)
@@ -148,7 +144,6 @@ class ResNet50(Model):
         self.train_optimizer.step()
     
     def test_epoch(self, batch_x, batch_y):
-        batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
         self.model.eval()
         pred = self.model(batch_x)
         loss = self.loss_fn(pred, batch_y)
@@ -159,12 +154,14 @@ class ResNet50(Model):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
             if batch_x.shape[0] != self.batch_size:
                 self.count_iter()
-                continue 
-            # train
+                continue
+            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
-            self.train_epoch(batch_x, batch_y)
-            self.test_epoch(batch_x, batch_y)
+            # train
+            with TimeEvaluator.time_context("resnet50_train"):
+                self.train_epoch(batch_x, batch_y)
+                self.test_epoch(batch_x, batch_y)
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
