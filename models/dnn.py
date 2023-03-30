@@ -119,6 +119,7 @@ class DNN(Model):
                 cur_loss.backward()
                 self.train_optimizer.step()
                 loss.update(cur_loss.item())
+                torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
