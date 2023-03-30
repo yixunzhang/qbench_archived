@@ -101,14 +101,14 @@ class Transformer(Model):
         else:
             raise NotImplementedError("optimizer {} is not supported!".format(optimizer))
         self.model.to(self.device)
+        if self.use_half:
+            self.model.half()
+            self.model.transformer_encoder.float()
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
             device_ids=[self.device.index],
             output_device=self.device.index,
             find_unused_parameters=True)
-        if self.use_half:
-            self.model.half()
-            self.model.transformer_encoder.float()
 
     def loss_fn(self, o, y):
         return torch.mean((o[..., 0] - y[..., 0]) ** 2)
@@ -141,6 +141,7 @@ class Transformer(Model):
             with TimeEvaluator.time_context("transformer_train"):
                 self.train_epoch(batch_x, batch_y)
                 self.test_epoch(batch_x, batch_y)
+                torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
