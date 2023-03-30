@@ -162,6 +162,7 @@ class ResNet50(Model):
             with TimeEvaluator.time_context("resnet50_train"):
                 self.train_epoch(batch_x, batch_y)
                 self.test_epoch(batch_x, batch_y)
+                torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
