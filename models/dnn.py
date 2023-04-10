@@ -113,7 +113,7 @@ class DNN(Model):
             self.model.train()
             self.train_optimizer.zero_grad()
             # forward
-            with TimeEvaluator.time_context("dnn_train"):
+            with TimeEvaluator.time_context("dnn_train_epoch(no h2d copy)"):
                 preds = self.model(batch_x)
                 cur_loss = self.get_loss(preds, batch_y)
                 cur_loss.backward()
