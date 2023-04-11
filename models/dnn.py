@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import intel_extension_for_pytorch as ipex
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
@@ -19,10 +20,9 @@ class Blocks(nn.Module):
             self.activation = nn.SiLU()
         else:
             raise NotImplementedError(f"This type of input is not supported")
-        self.bn = nn.BatchNorm1d(hidden_units)
 
     def forward(self, x):
-        return self.activation(self.bn(self.fc(x).transpose(1,2)).transpose(1,2))
+        return self.activation(self.fc(x).transpose(1,2)).transpose(1,2)
 
 class Net(nn.Module):
     def __init__(self, input_dim, output_dim=1, layers=(256,), act="LeakyReLU"):
@@ -56,7 +56,7 @@ class DNN(Model):
                           "low" : {"batch_size": 900, "hidden_size": 32},}
     def __init__(self,
                 gpu_util=None,
-                optimizer="gd",
+                optimizer="sgd",
                 weight_decay=0.0,
                 layers = (600,),
                 **kwargs,
@@ -88,11 +88,14 @@ class DNN(Model):
         self.model = Net(self.d_feat, layers=self.layers)
         if optimizer.lower() == "adam":
             self.train_optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        elif optimizer.lower() == "gd":
+        elif optimizer.lower() == "sgd":
             self.train_optimizer = optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         else:
             raise NotImplementedError("optimizer {} is not supported!".format(optimizer))
-        self.model.to(self.device)
+        if self.use_gpu:
+            self.model.to(self.device)
+        else:
+            self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
                                                             device_ids=[self.device.index],
@@ -103,22 +106,32 @@ class DNN(Model):
 
 
     def fit(self):
+        self.model.train()
+        loss = AverageMeter()
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
         # train
-            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+            if self.use_gpu:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             batch_x = batch_x.transpose(1, 0)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
-            loss = AverageMeter()
-            self.model.train()
-            self.train_optimizer.zero_grad()
             # forward
             with TimeEvaluator.time_context("dnn_train_epoch(no h2d copy)"):
-                preds = self.model(batch_x)
-                cur_loss = self.get_loss(preds, batch_y)
-                cur_loss.backward()
-                self.train_optimizer.step()
-                loss.update(cur_loss.item())
+                if self.use_bf16:
+                    with torch.cpu.amp.autocast():
+                        preds = self.model(batch_x)
+                        cur_loss = self.get_loss(preds, batch_y)
+                        cur_loss.backward()
+                        self.train_optimizer.step()
+                        loss.update(cur_loss.item())
+                else:
+                    preds = self.model(batch_x)
+                    cur_loss = self.get_loss(preds, batch_y)
+                    cur_loss.backward()
+                    self.train_optimizer.step()
+                    loss.update(cur_loss.item())
+                    if self.use_gpu:
+                        torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()

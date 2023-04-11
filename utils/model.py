@@ -54,6 +54,10 @@ class Model:
         return self.precision.lower() == "fp16"
 
     @property
+    def use_bf16(self):
+        return self.precision.lower() == "bf16"
+
+    @property
     def distributed(self):
         return hasattr(self, 'local_rank')
     

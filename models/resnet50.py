@@ -1,6 +1,7 @@
 import torch
 import torch.nn as  nn
 import torch.optim as optim
+import intel_extension_for_pytorch as ipex
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,14 +115,12 @@ class ResNet50(Model):
                 f"\nseed:       {self.seed}"
         )
         self.model = ResNet50Model(num_channels=self.batch_size)
-        if self.optimizer == "adam":
-            self.train_optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
-        elif self.optimier == "gd":
-            self.train_optimier = optim.SGD(self.model.parameters(), lr=self.lr)
-        else:
-            raise NotImplementedError("optimizer {} is not supported".format(self.optimizer))
+        self.train_optimizer = optim.SGD(self.model.parameters(), lr=self.lr)
         
-        self.model.to(self.device)
+        if self.use_gpu:
+            self.model.to(self.device)
+        else:
+            self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
                                                              device_ids=[self.device.index],
@@ -155,13 +154,21 @@ class ResNet50(Model):
             if batch_x.shape[0] != self.batch_size:
                 self.count_iter()
                 continue
-            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+            if self.use_gpu:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
             # train
             with TimeEvaluator.time_context("resnet50_train_epoch(no h2d copy)"):
-                self.train_epoch(batch_x, batch_y)
-                self.test_epoch(batch_x, batch_y)
+                if self.use_bf16:
+                    with torch.cpu.amp.autocast():
+                        self.train_epoch(batch_x, batch_y)
+                        self.test_epoch(batch_x, batch_y)
+                else:
+                    self.train_epoch(batch_x, batch_y)
+                    self.test_epoch(batch_x, batch_y)
+                    if self.use_gpu:
+                        torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()

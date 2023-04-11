@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import intel_extension_for_pytorch as ipex
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.model import Model
@@ -64,7 +65,7 @@ class Transformer(Model):
         num_layers=2,
         dropout=0,
         lr=0.0001,
-        optimizer="adam",
+        optimizer="sgd",
         reg=1e-3,
         gpu_util=None,
         **kwargs
@@ -96,19 +97,22 @@ class Transformer(Model):
         self.model = TransformerModel(self.d_feat, d_model, nhead, num_layers, dropout, self.device, self.use_half)
         if optimizer.lower() == "adam":
             self.train_optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.reg)
-        elif optimizer.lower() == "gd":
+        elif optimizer.lower() == "sgd":
             self.train_optimizer = optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.reg)
         else:
             raise NotImplementedError("optimizer {} is not supported!".format(optimizer))
-        self.model.to(self.device)
+        if self.use_gpu:
+            self.model.to(self.device)
+        else:
+            self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
+        if self.use_half:
+            self.model.half()
+            self.model.transformer_encoder.float()
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
             device_ids=[self.device.index],
             output_device=self.device.index,
             find_unused_parameters=True)
-        if self.use_half:
-            self.model.half()
-            self.model.transformer_encoder.float()
 
     def loss_fn(self, o, y):
         return torch.mean((o[..., 0] - y[..., 0]) ** 2)
@@ -123,7 +127,6 @@ class Transformer(Model):
         self.train_optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.model.parameters(), 3.6)
-        self.train_optimizer.step()
 
     def test_epoch(self, data_x, data_y):
         self.model.eval()
@@ -135,12 +138,20 @@ class Transformer(Model):
 
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
-            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+            if self.use_gpu:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
             with TimeEvaluator.time_context("transformer_train_epoch(no h2d copy)"):
-                self.train_epoch(batch_x, batch_y)
-                self.test_epoch(batch_x, batch_y)
+                if self.use_bf16:
+                    with torch.cpu.amp.autocast():
+                        self.train_epoch(batch_x, batch_y)
+                        self.test_epoch(batch_x, batch_y)
+                else:
+                    self.train_epoch(batch_x, batch_y)
+                    self.test_epoch(batch_x, batch_y)
+                    if self.use_gpu:
+                        torch.cuda.synchronize()
             self.count_iter()
         if self.use_gpu:
             torch.cuda.empty_cache()
