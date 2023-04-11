@@ -55,7 +55,7 @@ class DataSet(torch_data.dataset.Dataset):
         self.pointer += 1
         result = self.positions[ind]
         tuple_all = self.local_tuple_all if self.local else self.remote_tuple_all
-        with TimeEvaluator.time_context("get_item"):
+        with TimeEvaluator.time_context("get_item_time_usage"):
             ind_x = [tuple[result-self.clip + 1: result + 1][self.sample] for tuple in tuple_all]
         return np.concatenate(ind_x, axis=-1), np.zeros(10, np.float32)
 

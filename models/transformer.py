@@ -138,7 +138,7 @@ class Transformer(Model):
             batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             if self.use_half:
                 batch_x, batch_y = batch_x.half(), batch_y.half()
-            with TimeEvaluator.time_context("transformer_train"):
+            with TimeEvaluator.time_context("transformer_train_epoch(no h2d copy)"):
                 self.train_epoch(batch_x, batch_y)
                 self.test_epoch(batch_x, batch_y)
                 torch.cuda.synchronize()

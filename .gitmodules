@@ -1,0 +1,3 @@
+[submodule "pytorch-gpu-benchmark"]
+	path = pytorch-gpu-benchmark
+	url = https://github.com/ryujaehun/pytorch-gpu-benchmark.git
