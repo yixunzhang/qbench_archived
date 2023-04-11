@@ -31,7 +31,7 @@ WORKLOADS = {
         "ResNet50": ResNet50,
     }
 
-PRECISION = ["fp32", "fp16"]
+PRECISION = ["fp32", "fp16", "bf16"]
 GPU_UTILS = ["high", "median", "low"]
 def run_exp(workload, gpu_util, precision, device, batch_size, hidden_size, repeat, epoch, ti_dim, feat_dim, data_size, select_size, config_name, interval, num_workers, local, csv_file):
     net = WORKLOADS[workload](
@@ -63,16 +63,17 @@ def check_device(device):
         raise ValueError(f"Illegl devices {device}")
     if device != "cpu" and not torch.cuda.is_available():
         raise ValueError(f"Device ({device}) not available")
-    device_count = torch.cuda.device_count()
-    for _d in _devices:
-        if not int(_d.split(":")[-1]) < device_count:
-            raise ValueError(f"Illegal devices {_d}")
+    if device != "cpu":
+        device_count = torch.cuda.device_count()
+        for _d in _devices:
+            if not int(_d.split(":")[-1]) < device_count:
+                raise ValueError(f"Illegal devices {_d}")
 
 if __name__ == "__main__":
     import argparse
     import re
     parser = argparse.ArgumentParser(description="training bench")
-    parser.add_argument("--device", default="cuda:0",help="cpu on cuda: on cuda:,cuda:,cuda: (distributed mode) default cuda:0")
+    parser.add_argument("--device", default="cuda:0",help="cpu or cuda:<device_id> or cuda:<device_id>,cuda:<deivce_id>,cuda:<device_id> (distributed mode) default cuda:0")
     parser.add_argument("--batch_size", type=int, help="batch size value")
     parser.add_argument("--hidden_size", type=int, help="hidden size value")
     parser.add_argument("--ti_dim", type=int, default=2400, help="ticks to look back; set it to a small value to accelarate")
@@ -122,11 +123,14 @@ if __name__ == "__main__":
                 f"\nlogfile     : {logpath}"
                 f"\nfeature_dim : {args.feature_dim}"
                 f"\nremote_name : {args.remote_name}"
-                f"\n10cal_name  : {args.local_name}"
-                f"\nlocal_mode  : {args.local_mode}",
-                f"\ncsv_file    : {args.csv_file}")
+                f"\nlocal_name  : {args.local_name}"
+                f"\nlocal_mode  : {args.local_mode}")
     params_iters = list(itertools.product(params_workload, params_gpu_utils, params_precision))
     for _workload, _gpu_uitls, _precision in params_iters:
+        if args.device == "cpu" and _precision == "fp16":
+            continue
+        if args.device != "cpu" and _precision == "bf16":
+            continue
         TimeEvaluator.measure_time(len(params_iters))(run_exp)(
                     workload = _workload,
                     gpu_util = _gpu_uitls,
