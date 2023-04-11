@@ -81,7 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_size", type=int, default=DATA_SIZE, help="total number of training instances; data_size should be 5*19**6 when using the default ib config file")
     parser.add_argument("--select_size", type=int, default=DATA_SIZE, help="select part of training instances to accelerate, default is data size. select_size cannot be greater than data_size")
     parser.add_argument("--gpu_utils", choices=[*GPU_UTILS, "all"], help="recommmended settings for hidden_dim and batch_size, for different gpu utils; or set by batch_size and hidden_dim")
-    parser.add_argument("--precision", default="all", choices=[*PRECISION, "all"], help="precision used in training")
+    parser.add_argument("--precision", default="all", choices=[*PRECISION, "all"], help="precision used in training, fp16 only available on cuda and bf16 only available on cpu")
     parser.add_argument("--workload", default="all", choices=[*WORKLOADS, "all"])
     parser.add_argument("--epoch", default=1, type=int)
     parser.add_argument("--repeat", default=1, type=int, help="nepeat reset train data loader times, default is 1")
