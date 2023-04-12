@@ -84,9 +84,15 @@ def train(precision, result, use_opt):
                 img = getattr(img, precision)()
                 start = time.time()
                 model.zero_grad()
-                prediction = model(img)
-                loss = criterion(prediction, target)
-                loss.backward()
+                if precision == "bfloat16":
+                    with torch.cpu.amp.autocast():
+                        prediction = model(img)
+                        loss = criterion(prediction, target)
+                        loss.backward()
+                else:
+                    prediction = model(img)
+                    loss = criterion(prediction, target)
+                    loss.backward()
                 train_optimizer.step()
                 end = time.time()
                 if step >= args.WARM_UP:
