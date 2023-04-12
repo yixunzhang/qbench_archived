@@ -10,6 +10,7 @@ pytorch training benchmark
 2. For multiple GPUs:  `torchrun --nproc_per_node 4 train.py --local_mode --print --workload ALSTM --precision fp32 --gpu_utils low --data_size 500000 --select_size 50000 --distributed --device cuda:0,cuda:1,cuda:2,cuda:3`
 3. Check details by `python train.py --help`
 4. To get the csv result in `result` file, run `python train.py --workload all --data_size 5000 --gpu_utils all --select_size 5000 --local_mode --print`
+5. To train cv-network of torch.vision, just run `python train_cv_network.py` and `python train_cv_network_ipex.py`
 
 ## Docker images
 1. For Nvdia GPU: 
