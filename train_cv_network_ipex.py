@@ -33,7 +33,7 @@ parser.add_argument(
     "--NUM_TEST", "-n", type=int, default=50, required=False, help="Num of Test"
 )
 parser.add_argument(
-    "--BATCH_SIZE", "-b", type=int, default=12, required=False, help="Num of batch size"
+    "--BATCH_SIZE", "-b", type=int, default=64, required=False, help="Num of batch size"
 )
 parser.add_argument(
     "--NUM_CLASSES", "-c", type=int, default=1000, required=False, help="Num of class"
