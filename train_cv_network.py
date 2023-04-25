@@ -30,7 +30,7 @@ MODEL_LIST = {
 }
 
 precisions = ["float", "half"]
-gpu_nums = [1, 2]
+gpu_nums = [1]
 # For post-voltaic architectures, there is a possibility to use tensor-core at half precision.
 # Due to the gradient overflow problem, apex is recommended for practical use.
 device_name = str(torch.cuda.get_device_name(0))
@@ -43,7 +43,7 @@ parser.add_argument(
     "--NUM_TEST", "-n", type=int, default=50, required=False, help="Num of Test"
 )
 parser.add_argument(
-    "--BATCH_SIZE", "-b", type=int, default=12, required=False, help="Num of batch size"
+    "--BATCH_SIZE", "-b", type=int, default=64, required=False, help="Num of batch size"
 )
 parser.add_argument(
     "--NUM_CLASSES", "-c", type=int, default=1000, required=False, help="Num of class"
