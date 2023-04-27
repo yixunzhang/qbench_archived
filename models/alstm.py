@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import intel_extension_for_pytorch as ipex
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
 from utils.profiler import TimeEvaluator
@@ -71,6 +70,7 @@ class ALSTM(Model):
         if self.use_gpu:
             self.model.to(self.device)
         else:
+            import intel_extension_for_pytorch as ipex
             self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
@@ -104,11 +104,11 @@ class ALSTM(Model):
 
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
-            if self.use_gpu:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-            if self.use_half:
-                batch_x, batch_y = batch_x.half(), batch_y.half()
-            with TimeEvaluator.time_context("alstm_train_epoch(no h2d copy)"):
+            with TimeEvaluator.time_context("alstm_train_epoch", warmup=5):
+                if self.use_gpu:
+                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                if self.use_half:
+                    batch_x, batch_y = batch_x.half(), batch_y.half()
                 if self.use_bf16:
                     with torch.cpu.amp.autocast():
                         self.train_epoch(batch_x, batch_y)
