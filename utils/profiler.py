@@ -13,16 +13,26 @@ class TimeEvaluator:
     df_buffer = None
     file_name = None
     logger = None
+    test_index_records = {}
     class time_context:
-        def __init__(self, measure_id):
+        def __init__(self, measure_id, warmup=0):
             self.measure_id = measure_id
+            self.warmup = warmup
+            if self.measure_id in TimeEvaluator.test_index_records:
+                TimeEvaluator.test_index_records[self.measure_id] += 1
+            else:
+                TimeEvaluator.test_index_records[self.measure_id] = 0
 
         def __enter__(self):
+            if TimeEvaluator.test_index_records[self.measure_id] < self.warmup:
+                return self
             self._time = perf_counter()
             TimeEvaluator.add_test_time(self.measure_id, -1)
             return self
     
         def __exit__(self, type, value, traceback):
+            if TimeEvaluator.test_index_records[self.measure_id] < self.warmup:
+                return
             self.time_usage = perf_counter() - self._time
             TimeEvaluator.add_test_time(self.measure_id, self.time_usage)
         
