@@ -33,7 +33,7 @@ precisions = ["float", "half"]
 gpu_nums = [1]
 # For post-voltaic architectures, there is a possibility to use tensor-core at half precision.
 # Due to the gradient overflow problem, apex is recommended for practical use.
-device_name = str(torch.cuda.get_device_name(0))
+device_name = str(torch.cuda.get_device_name(0)).replace(" ", "_")
 # Training settings
 parser = argparse.ArgumentParser(description="PyTorch Benchmarking")
 parser.add_argument(
@@ -69,7 +69,7 @@ class RandomDataset(Dataset):
     def __len__(self):
         return self.len
 
-def train(precision, result, gpu_num):
+def train(precision, result, gpu_num, with_data_trans=False):
     rand_loader = DataLoader(
         dataset=RandomDataset(args.BATCH_SIZE * gpu_num * (args.WARM_UP + args.NUM_TEST)),
         batch_size=args.BATCH_SIZE * gpu_num,
@@ -92,10 +92,15 @@ def train(precision, result, gpu_num):
             print(f"Benchmarking Training {precision} precision type {model_name} on {gpu_num} gpu")
             for step, img in enumerate(rand_loader):
                 img = getattr(img, precision)()
-                torch.cuda.synchronize()
-                start = time.time()
                 model.zero_grad()
-                prediction = model(img.to("cuda"))
+                if with_data_trans:
+                    torch.cuda.synchronize()
+                    start = time.time()
+                img = img.to("cuda")
+                if not with_data_trans:
+                    torch.cuda.synchronize()
+                    start = time.time()
+                prediction = model(img)
                 loss = criterion(prediction, target)
                 loss.backward()
                 train_optimizer.step()
@@ -158,7 +163,6 @@ if __name__ == "__main__":
         f.writelines(s + "\n" for s in gpu_configs)
 
     train_result = {'type': []}
-    inference_result = {'type': []}
     for gpu_num in gpu_nums:
         for precision in precisions:
             train_result['type'].append(str(gpu_num)+precision)
@@ -167,6 +171,16 @@ if __name__ == "__main__":
     train_result_df = pd.DataFrame(train_result)
     path = f"{folder_name}/{device_name}_train_benchmark.csv"
     train_result_df.T.to_csv(path, index=True, header=False)
+
+    train_result_with_trans = {'type': []}
+    for gpu_num in gpu_nums:
+        for precision in precisions:
+            train_result_with_trans['type'].append(str(gpu_num)+precision)
+            train(precision, train_result_with_trans, gpu_num, True)
+
+    train_result_with_trans_df = pd.DataFrame(train_result_with_trans)
+    path = f"{folder_name}/{device_name}_train_benchmark_with_trans.csv"
+    train_result_with_trans_df.T.to_csv(path, index=True, header=False)
 
     now = datetime.datetime.now()
 
