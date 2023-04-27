@@ -1,7 +1,6 @@
 import torch
 import torch.nn as  nn
 import torch.optim as optim
-import intel_extension_for_pytorch as ipex
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
