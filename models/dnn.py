@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import intel_extension_for_pytorch as ipex
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
@@ -110,13 +109,13 @@ class DNN(Model):
         loss = AverageMeter()
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
         # train
-            if self.use_gpu:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-            batch_x = batch_x.transpose(1, 0)
-            if self.use_half:
-                batch_x, batch_y = batch_x.half(), batch_y.half()
-            # forward
-            with TimeEvaluator.time_context("dnn_train_epoch(no h2d copy)"):
+            with TimeEvaluator.time_context("dnn_train_epoch", warmup=5):
+                if self.use_gpu:
+                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                batch_x = batch_x.transpose(1, 0)
+                if self.use_half:
+                    batch_x, batch_y = batch_x.half(), batch_y.half()
+                # forward
                 if self.use_bf16:
                     with torch.cpu.amp.autocast():
                         preds = self.model(batch_x)
