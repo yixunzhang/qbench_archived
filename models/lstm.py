@@ -116,12 +116,12 @@ class LSTM(Model):
 
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
-            if self.use_gpu:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-            if self.use_half:
-                batch_x, batch_y = batch_x.half(), batch_y.half()
-            # train
-            with TimeEvaluator.time_context("lstm_train_epoch(no h2d copy)"):
+            with TimeEvaluator.time_context("lstm_train_epoch", warmup=5):
+                if self.use_gpu:
+                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                if self.use_half:
+                    batch_x, batch_y = batch_x.half(), batch_y.half()
+                # train
                 if self.use_bf16:
                     with torch.cpu.amp.autocast():
                         self.train_epoch(batch_x, batch_y)
