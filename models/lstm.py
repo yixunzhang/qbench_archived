@@ -4,7 +4,7 @@ import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import intel_extension_for_pytorch as ipex
+
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.model import Model
@@ -84,6 +84,7 @@ class LSTM(Model):
         if self.use_gpu:
             self.model.to(self.device)
         else:
+            import intel_extension_for_pytorch as ipex
             self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
