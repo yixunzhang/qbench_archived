@@ -94,6 +94,7 @@ class DNN(Model):
         if self.use_gpu:
             self.model.to(self.device)
         else:
+            import intel_extension_for_pytorch as ipex
             self.model, self.train_optimizer = ipex.optimize(self.model, optimizer=self.train_optimizer, dtype=torch.bfloat16 if self.use_bf16 else torch.float32)
         if self.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
