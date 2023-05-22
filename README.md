@@ -6,10 +6,10 @@ pytorch training benchmark
 2. Run utils/localdata.py by executing `python3 utils/localdata.py -c config_local.xml`
 
 ## Run test
-1. For single GPU: `python3 train.py --local_mode --print --workload LSTM --gpu_utils low --precision fp32 --select_size 5000 --data_size 500000`
-2. For multiple GPUs:  `torchrun --nproc_per_node 4 train.py --local_mode --print --workload ALSTM --precision fp32 --gpu_utils low --data_size 500000 --select_size 50000 --distributed --device cuda:0,cuda:1,cuda:2,cuda:3`
+1. For single GPU: `python3 train.py --local_mode --print --workload LSTM --gpu_utils low --precision fp32 --data_size 500000`
+2. For multiple GPUs:  `torchrun --nproc_per_node 4 train.py --local_mode --print --workload ALSTM --precision fp32 --gpu_utils low --data_size 500000 --distributed --device cuda:0,cuda:1,cuda:2,cuda:3`
 3. Check details by `python train.py --help`
-4. To get the csv result in `result` file, run `python train.py --workload all --data_size 5000 --gpu_utils all --select_size 5000 --local_mode --print`
+4. To get the csv result in `result` file, run `python train.py`
 5. To train cv-network of torch.vision, just run `python train_cv_network.py` and `python train_cv_network_ipex.py`
 
 ## Docker images
