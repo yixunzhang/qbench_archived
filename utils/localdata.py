@@ -32,6 +32,9 @@ def generate_random_dataset(xml_file):
     names_and_shapes = get_file_name_and_shape(xml_file)
     for filename, shape in names_and_shapes.items():
         print(f"Generating data with shape:{shape}")
+        dirname = os.path.dirname(filename)
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
         data = np.random.randn(*shape).astype(np.float32)
         np.save(filename, data)
         print(f"{filename} saved") 
