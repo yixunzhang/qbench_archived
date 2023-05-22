@@ -109,9 +109,12 @@ class DNN(Model):
         self.model.train()
         loss = AverageMeter()
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
-        # train
+            if not self.measure_all and self.use_gpu:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                torch.cuda.synchronize()
+            # train
             with TimeEvaluator.time_context("dnn_train_epoch", warmup=5):
-                if self.use_gpu:
+                if self.measure_all and self.use_gpu:
                     batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
                 batch_x = batch_x.transpose(1, 0)
                 if self.use_half:
@@ -132,7 +135,8 @@ class DNN(Model):
                     loss.update(cur_loss.item())
                     if self.use_gpu:
                         torch.cuda.synchronize()
-            self.count_iter()
+            if not self.check_iter()
+                break
         if self.use_gpu:
             torch.cuda.empty_cache()
     
