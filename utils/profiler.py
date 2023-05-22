@@ -119,7 +119,7 @@ class TimeEvaluator:
                     device_info = cpuinfo.get_cpu_info()["brand_raw"]
                 else:
                     device_info = torch.cuda.get_device_name(kwargs["device"].split(",")[0])
-                file_name = re.sub('[^a-zA-Z0-9]', '_', device_info.replace(" ", "")) + ".csv"
+                file_name = re.sub('[^a-zA-Z0-9]', '_', device_info) + "_private_train_benchmark.csv"
                 TimeEvaluator.file_name = os.path.join(os.path.dirname(os.path.dirname(__file__)), "result", file_name)
             else:
                 TimeEvaluator.file_name = kwargs["csv_file"]
