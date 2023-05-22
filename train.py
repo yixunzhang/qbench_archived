@@ -78,13 +78,13 @@ def check_device(device):
 
 def analyze_result(path):
     df_test=pd.read_csv(path)
-    df_base = pd.read_csv(f"{os.path.dirname(_file_)}/result/baseline_private.csv")
+    df_base = pd.read_csv(f"{os.path.dirname(os.path.abspath(__file__))}/result/baseline_private.csv")
     models=set(df_base["workload"])
     precisions = set(df_base["precision"])
     measures = set(df_base["measure"]) 
 
     df_acc = df_test
-    df_acc["train_epoch(ms)"] = df_test["train_epoch(ms)"]/df_base["train_epoch(ms)"] 
+    df_acc["train_epoch(ms)"] = df_base["train_epoch(ms)"]  / df_test["train_epoch(ms)"]
     labels=[]
     boxes=[]
     for precision in precisions:
