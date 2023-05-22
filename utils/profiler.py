@@ -111,7 +111,7 @@ class TimeEvaluator:
     
     @staticmethod
     def init_csv_dump_info(kwargs):
-        params = {k:[v] for k, v in kwargs.items() if k not in ["config_name", "csv_file", "local", "select_size", "data_size", "epoch", "repeat", "device", "num_workers"]}
+        params = {k:[v] for k, v in kwargs.items() if k in ["workload", "gpu_util", "precision", "measure"]}
         if TimeEvaluator.file_name is None:
             if kwargs["csv_file"] is None:
                 if kwargs["device"] == "cpu":
