@@ -204,7 +204,7 @@ if __name__ == "__main__":
             train(precision, train_result, gpu_num)
 
     train_result_df = pd.DataFrame(train_result)
-    path = f"{folder_name}/{device_name}_train_benchmark.csv"
+    path = f"{folder_name}/{device_name}_public_train_benchmark.csv"
     train_result_df.T.to_csv(path, index=True, header=False)
 
     train_result_with_trans = {'type': []}
@@ -214,7 +214,7 @@ if __name__ == "__main__":
             train(precision, train_result_with_trans, gpu_num, True)
 
     train_result_with_trans_df = pd.DataFrame(train_result_with_trans)
-    path = f"{folder_name}/{device_name}_train_benchmark_with_trans.csv"
+    path = f"{folder_name}/{device_name}_public_train_benchmark_with_trans.csv"
     train_result_with_trans_df.T.to_csv(path, index=True, header=False)
 
     now = datetime.datetime.now()
