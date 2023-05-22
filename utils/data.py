@@ -7,11 +7,10 @@ import torch
 
 
 class TrainLoader:
-    def __init__(self, batch_size, data_size, select_size, distributed):
+    def __init__(self, batch_size, data_size, distributed):
         self.batch_size = batch_size
         self.data_size = data_size
         self.distributed = distributed
-        self.select_size = select_size
 
     @staticmethod
     def worker_init_fn_local(_):
@@ -23,19 +22,16 @@ class TrainLoader:
         ds.local_tuple_all = lst
 
     def __call__(self, data_set, num_workers, local):
-        sampler = DistributedSampler(data_set) if self.distributed else DataSampler(self.data_size, self.select_size)
+        sampler = DistributedSampler(data_set) if self.distributed else DataSampler(self.data_size)
         worker_init_fn = self.worker_init_fn_pyibverbs if not local else self.worker_init_fn_local
         return torch_data.DataLoader(dataset=data_set, batch_size=self.batch_size, sampler=sampler, timeout=100000,
                                         worker_init_fn=worker_init_fn, num_workers=num_workers, pin_memory=True)
 
 class DataSet(torch_data.dataset.Dataset):
-    def __init__(self, config_name, ti_dim=2500, data_size = 5*10**6, select_size = None, interval=10**3, clip=100, local=False):
-        if select_size is None:
-            select_size = data_size
-        elif select_size > data_size:
-            raise ValueError(f"select size {select_size} will be equal or less than {data_size}")
+    def __init__(self, config_name, ti_dim=2500, data_size = 5*10**6, interval=10**3, clip=100, local=False):
         self.local = local
         self.clip = clip
+        self.data_size = data_size
         if self.local:
             self.local_name_all, self.local_tuple_all= get_file_names(config_name), None
         else:
@@ -43,7 +39,6 @@ class DataSet(torch_data.dataset.Dataset):
         
         self.sample = np.random.randint(0, self.clip, ti_dim)
         self.positions = np.random.randint(10 ** 3, data_size, data_size)
-        self.select_size = select_size
         self.interval = interval
         self.pointer = 0
 
@@ -60,16 +55,13 @@ class DataSet(torch_data.dataset.Dataset):
         return np.concatenate(ind_x, axis=-1), np.zeros(10, np.float32)
 
     def __len__(self):
-        return self.select_size
+        return self.data_size
 
 class DataSampler(torch_data.Sampler):
-    def __init__(self, data_size, select_size=None):
+    def __init__(self, data_size):
         super(DataSampler, self).__init__([])
-        if select_size > data_size:
-            raise ValueError(f"select size {select_size} will be equal or less than {data_size}")
         self.pointer = 0
         self.positions = np.random.randint(10 ** 3, data_size, data_size)
-        self.select_size = select_size
         self.data_size = data_size
 
     def __iter__(self):
@@ -83,4 +75,4 @@ class DataSampler(torch_data.Sampler):
         return result
 
     def __len__(self):
-        return self.select_size
+        return self.data_size
