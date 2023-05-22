@@ -50,7 +50,7 @@ def run_exp(workload, gpu_util, precision, measure, device, batch_size, hidden_s
                                 data_size = data_size,
                                 max_iters = max_iters,
                                 d_feat = feat_dim, 
-                                meaure = measure)
+                                measure = measure)
     for _ in range(repeat):
         with TimeEvaluator.time_context("train-overall"):
             with TimeEvaluator.time_context("init data"):
@@ -108,7 +108,7 @@ def analyze_result(path):
                "lower_quartile":lower_quartile_vals,
                "max" : max_vals}
     print(pd.DataFrame(summary))
-    print(＂首行解释：在所跑的模型中，在精度{}，{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍.format(
+    print("首行解释：在所跑的模型中，在精度{}，{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍".format(
             labels[0].split("-")[0], labels[0].split("-")[1], min_vals[labels[0]], upper_quartile_vals[labels[0]],
             median_vals[labels[0]], mean_vals[labels[0]],lower_quartile_vals[labels[0]], max_vals[labels[0]]))
     summary_path = path.split(".")[0] + "_summary.csv"

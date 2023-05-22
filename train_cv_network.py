@@ -128,29 +128,35 @@ def analyze_result(path, path_with_trans):
     df_base =pd.read_csv(f"{RESULT_FOLDER}/baseline_public.csv")
     df_base_trans = pd.read_csv(f"{RESULT_FOLDER}/baseline_public_with_trans.csv")
     df_test = pd.read_csv(path)
-    df_test_trans = pd.read_csv(path_with_trans) models=list(set(df_base["type"]))
+    df_test_trans = pd.read_csv(path_with_trans)
+    models=list(set(df_base["type"]))
     precisions =list(df_base.columns)[1:]
     values = df_test
-    labels=[] boxes=[]
+    labels=[]
+    boxes=[]
     for precision in precisions:
         values[precision] = df_base[precision] / df_test[precision]
         boxes.append(np.concatenate([values.loc[values["type"]==model][precision].values for model in models]))
         labels.append(precision +"_end2end")
-    values_trans = df_test_trans for precision in precisions:
+    values_trans = df_test_trans 
+    for precision in precisions:
         values_trans[precision] = df_base_trans[precision] / df_test_trans[precision]
         boxes.append(np.concatenate([values_trans.loc[values_trans["type"]==model][precision].values for model in models]))
         labels.append(precision + "_no_h2d")
     bp = plt.boxplot(boxes, showmeans=True, meanline=True, labels=labels)
     plt.savefig(path.split(".")[0] +"_summary.png")
-    mean_vals = {k:m.get_ydata()[0] for k, m in zip(labels, bp["means"])} median_vals={k:m.get_ydata()[0] for k,m in zip(labels, bp["medians"])}
-    whiskers_vals=list(map(lambda x:[*x[0],*x[1]],zip(*[iter([m.get_ydata() for m in bp["whiskers"]])]*2))) upper_quartile_vals = {k:v[0] for k, v in zip(labels, whiskers_vals)}
-    lower_quartile_vals = {k:v[2] for k, v in zip(labels, whiskers_vals)} min_vals ={k:v[1] for k, v in zip(labels, whiskers_vals)}
+    mean_vals = {k:m.get_ydata()[0] for k, m in zip(labels, bp["means"])}
+    median_vals={k:m.get_ydata()[0] for k,m in zip(labels, bp["medians"])}
+    whiskers_vals=list(map(lambda x:[*x[0],*x[1]],zip(*[iter([m.get_ydata() for m in bp["whiskers"]])]*2)))
+    upper_quartile_vals = {k:v[0] for k, v in zip(labels, whiskers_vals)}
+    lower_quartile_vals = {k:v[2] for k, v in zip(labels, whiskers_vals)}
+    min_vals ={k:v[1] for k, v in zip(labels, whiskers_vals)}
     max_vals = {k:v[3] for k, v in zip(labels, whiskers_vals)} 
     summary={"min":min_vals,"upper_quartile": upper_quartile_vals, "median" : median_vals,"mean":mean_vals,"lower_quartile":lower_quartile_vals, "max" : max_vals}
     print(pd.DataFrame(summary))
-    print("首行解释：在所跑的模型中，在精度{}．{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍＂．format(
+    print("首行解释：在所跑的模型中，在精度{}．{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍".format(
             labels[0].split("_")[0], labels[0].split("_")[1], min_vals[labels[0]], upper_quartile_vals[labels[0]],
-          median_vals[labels[0]], mean_vals[labels[0]], lower_quartile_vals[labels[0]], max_vals[labels[0]]))
+            median_vals[labels[0]], mean_vals[labels[0]], lower_quartile_vals[labels[0]], max_vals[labels[0]]))
     summary_path =path.split(".")[0] + "_summary.csv"
     pd.DataFrame(summary).to_csv(summary_path)
     print(f"summary saved in {summary_path}") 
