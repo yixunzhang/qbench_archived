@@ -151,11 +151,14 @@ class ResNet50(Model):
 
     def fit(self):
         for _, (batch_x, batch_y) in enumerate(self.train_loader):
+            if batch_x.shape[0] != self.batch_size:
+                self.count_iter()
+                continue
+            if not self.measure_all and self.use_gpu:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                torch.cuda.synchronize()
             with TimeEvaluator.time_context("resnet50_train_epoch", warmup=5):
-                if batch_x.shape[0] != self.batch_size:
-                    self.count_iter()
-                    continue
-                if self.use_gpu:
+                if if self.measure_all and self.use_gpu:
                     batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
                 if self.use_half:
                     batch_x, batch_y = batch_x.half(), batch_y.half()
@@ -169,7 +172,8 @@ class ResNet50(Model):
                     self.test_epoch(batch_x, batch_y)
                     if self.use_gpu:
                         torch.cuda.synchronize()
-            self.count_iter()
+            if not self.check_iter()
+                break
         if self.use_gpu:
             torch.cuda.empty_cache()
 
