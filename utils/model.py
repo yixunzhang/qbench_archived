@@ -19,7 +19,7 @@ class Model:
         seed=None,
         precision="fp32",
         data_size = 5 * 10 ** 6,
-        select_size = 5 * 16 ** 6,
+        max_iters = 20,
         **kwargs
     ):
         # set hypeP-parameters.
@@ -33,7 +33,8 @@ class Model:
         self.seed = seed
         self.precision = precision
         self.data_size = data_size
-        self.select_size = select_size
+        self.max_iters = max_iters
+        self.measure = kwargs["measure"]
         if self.seed is not None:
             np.random.seed(self.seed)
             torch.manual_seed(self.seed)
@@ -44,6 +45,10 @@ class Model:
             devices = device.split(",")
             self.local_rank = torch.distributed.get_rank()
             self.device = torch.device(devices[self.local_rank%(len(devices))])
+
+    @property
+    def measure_all(self):
+        return self.measure == "end2end"
 
     @property
     def use_gpu(self):
@@ -63,21 +68,25 @@ class Model:
     
     def set_iter(self):
         if self.distributed:
-            self.iter_total = ceil(self.select_size / self.batch_size / torch.distributed.get_world_size())
+            self.iter_total = ceil(self.data_size / self.batch_size / torch.distributed.get_world_size())
         else:
-            self.iter_total = ceil(self.select_size / self.batch_size)
+            self.iter_total = ceil(self.data_size / self.batch_size)
+        self.iter_total = min(self.iter_total, self.max_iters)
         self.iter_current = 0
-        self.pct_interval = 5
+        self.pct_interval = 10
         self.pct_next = self.pct_interval
 
-    def count_iter(self):
+    def check_iter(self):
         self.iter_current += 1
         if self.iter_current / self.iter_total * 100 >= self.pct_next:
             self.logger.info(f"Train: {self.pct_next}%")
             self.pct_next += self.pct_interval
+        if self.iter_current >= self.max_iters:
+            return False
+        return True
 
     def train_loader_init(self, data_set, num_workers, local):
-        self.train_loader = TrainLoader(self.batch_size, self.data_size, self.select_size, self.distributed)(data_set, num_workers, local)
+        self.train_loader = TrainLoader(self.batch_size, self.data_size, self.distributed)(data_set, num_workers, local)
 
     def fit(self):
         raise NotImplementedError()
