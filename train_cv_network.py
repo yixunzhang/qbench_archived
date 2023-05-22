@@ -12,6 +12,8 @@ import pandas as pd
 import argparse
 from torch.utils.data import Dataset, DataLoader
 import json
+import numpy as np
+import matplotlib.pyplot as plt
 
 torch.backends.cudnn.benchmark = True
 # https://discuss.pytorch.org/t/what-does-torch-backends-cudnn-benchmark-do/5936
@@ -33,7 +35,8 @@ precisions = ["float", "half"]
 gpu_nums = [1]
 # For post-voltaic architectures, there is a possibility to use tensor-core at half precision.
 # Due to the gradient overflow problem, apex is recommended for practical use.
-device_name = str(torch.cuda.get_device_name(0)).replace(" ", "_")
+import re
+device_name = re.sub('[^a-zA-Z0-9]', "_", torch.cuda.get_device_name(0))
 # Training settings
 parser = argparse.ArgumentParser(description="PyTorch Benchmarking")
 parser.add_argument(
@@ -57,6 +60,8 @@ parser.add_argument(
     help="folder to save results",
 )
 args = parser.parse_args()
+
+RESULT_FOLDER = f"{os.path.dirname(os.path.abspath(__file__))}/result"
 
 class RandomDataset(Dataset):
     def __init__(self, length):
@@ -119,6 +124,36 @@ def train(precision, result, gpu_num, with_data_trans=False):
 
 f"{platform.uname()}\n{psutil.cpu_freq()}\ncpu_count: {psutil.cpu_count()}\nmemory_available: {psutil.virtual_memory().available}"
 
+def analyze_result(path, path_with_trans):
+    df_base =pd.read_csv(f"{RESULT_FOLDER}/baseline_public.csv")
+    df_base_trans = pd.read_csv(f"{RESULT_FOLDER}/baseline_public_with_trans.csv")
+    df_test = pd.read_csv(path)
+    df_test_trans = pd.read_csv(path_with_trans) models=list(set(df_base["type"]))
+    precisions =list(df_base.columns)[1:]
+    values = df_test
+    labels=[] boxes=[]
+    for precision in precisions:
+        values[precision] = df_base[precision] / df_test[precision]
+        boxes.append(np.concatenate([values.loc[values["type"]==model][precision].values for model in models]))
+        labels.append(precision +"_end2end")
+    values_trans = df_test_trans for precision in precisions:
+        values_trans[precision] = df_base_trans[precision] / df_test_trans[precision]
+        boxes.append(np.concatenate([values_trans.loc[values_trans["type"]==model][precision].values for model in models]))
+        labels.append(precision + "_no_h2d")
+    bp = plt.boxplot(boxes, showmeans=True, meanline=True, labels=labels)
+    plt.savefig(path.split(".")[0] +"_summary.png")
+    mean_vals = {k:m.get_ydata()[0] for k, m in zip(labels, bp["means"])} median_vals={k:m.get_ydata()[0] for k,m in zip(labels, bp["medians"])}
+    whiskers_vals=list(map(lambda x:[*x[0],*x[1]],zip(*[iter([m.get_ydata() for m in bp["whiskers"]])]*2))) upper_quartile_vals = {k:v[0] for k, v in zip(labels, whiskers_vals)}
+    lower_quartile_vals = {k:v[2] for k, v in zip(labels, whiskers_vals)} min_vals ={k:v[1] for k, v in zip(labels, whiskers_vals)}
+    max_vals = {k:v[3] for k, v in zip(labels, whiskers_vals)} 
+    summary={"min":min_vals,"upper_quartile": upper_quartile_vals, "median" : median_vals,"mean":mean_vals,"lower_quartile":lower_quartile_vals, "max" : max_vals}
+    print(pd.DataFrame(summary))
+    print("首行解释：在所跑的模型中，在精度{}．{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍＂．format(
+            labels[0].split("_")[0], labels[0].split("_")[1], min_vals[labels[0]], upper_quartile_vals[labels[0]],
+          median_vals[labels[0]], mean_vals[labels[0]], lower_quartile_vals[labels[0]], max_vals[labels[0]]))
+    summary_path =path.split(".")[0] + "_summary.csv"
+    pd.DataFrame(summary).to_csv(summary_path)
+    print(f"summary saved in {summary_path}") 
 
 if __name__ == "__main__":
     folder_name = args.folder
@@ -188,3 +223,4 @@ if __name__ == "__main__":
     print(f"benchmark end : {end_time}")
     with open(os.path.join(folder_name, "system_info.txt"), "a") as f:
         f.writelines(f"benchmark end : {end_time}\n")
+    analyze_result(path, path_with_trans)
