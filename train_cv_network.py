@@ -220,8 +220,8 @@ if __name__ == "__main__":
             train(precision, train_result_with_trans, gpu_num, True)
 
     train_result_with_trans_df = pd.DataFrame(train_result_with_trans)
-    path = f"{folder_name}/{device_name}_public_train_benchmark_with_trans.csv"
-    train_result_with_trans_df.T.to_csv(path, index=True, header=False)
+    path_with_trans = f"{folder_name}/{device_name}_public_train_benchmark_with_trans.csv"
+    train_result_with_trans_df.T.to_csv(path_with_trans, index=True, header=False)
 
     now = datetime.datetime.now()
 
