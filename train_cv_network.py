@@ -32,7 +32,6 @@ MODEL_LIST = {
 }
 
 precisions = ["float", "half"]
-gpu_nums = [1]
 # For post-voltaic architectures, there is a possibility to use tensor-core at half precision.
 # Due to the gradient overflow problem, apex is recommended for practical use.
 import re
@@ -51,6 +50,11 @@ parser.add_argument(
 parser.add_argument(
     "--NUM_CLASSES", "-c", type=int, default=1000, required=False, help="Num of class"
 )
+
+parser.add_argument(
+    "--NUM_DEVICES", "-d", type=int, default=1, required=False, help="Num of devices"
+)
+
 parser.add_argument(
     "--folder",
     "-f",
@@ -60,6 +64,8 @@ parser.add_argument(
     help="folder to save results",
 )
 args = parser.parse_args()
+
+gpu_nums = [args.NUM_DEVICES]
 
 RESULT_FOLDER = f"{os.path.dirname(os.path.abspath(__file__))}/result"
 
@@ -135,14 +141,16 @@ def analyze_result(path, path_with_trans):
     labels=[]
     boxes=[]
     for precision in precisions:
-        values[precision] = df_base[precision] / df_test[precision]
-        boxes.append(np.concatenate([values.loc[values["type"]==model][precision].values for model in models]))
-        labels.append(precision +"_end2end")
+        new_precision = precision if int(precision[0]) == gpu_nums[0] else f"{gpu_nums[0]}{precision[1:]}"
+        values[new_precision] = df_base[precision] / df_test[new_precision]
+        boxes.append(np.concatenate([values.loc[values["type"]==model][new_precision].values for model in models]))
+        labels.append(new_precision +"_end2end")
     values_trans = df_test_trans 
     for precision in precisions:
-        values_trans[precision] = df_base_trans[precision] / df_test_trans[precision]
-        boxes.append(np.concatenate([values_trans.loc[values_trans["type"]==model][precision].values for model in models]))
-        labels.append(precision + "_no_h2d")
+        new_precision = precision if int(precision[0]) == gpu_nums[0] else f"{gpu_nums[0]}{precision[1:]}"
+        values_trans[new_precision] = df_base_trans[precision] / df_test_trans[new_precision]
+        boxes.append(np.concatenate([values_trans.loc[values_trans["type"]==model][new_precision].values for model in models]))
+        labels.append(new_precision + "_no_h2d")
     bp = plt.boxplot(boxes, showmeans=True, meanline=True, labels=labels)
     plt.savefig(path.split(".")[0] +"_summary.png")
     mean_vals = {k:m.get_ydata()[0] for k, m in zip(labels, bp["means"])}

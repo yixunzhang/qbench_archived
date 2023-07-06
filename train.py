@@ -37,7 +37,7 @@ PRECISION = ["fp32", "fp16", "bp16"]
 PRECISION_GPU = ["fp32", "fp16"]
 PRECISION_CPU = ["fp32", "bf16"]
 GPU_UTILS = ["high", "median", "low"]
-MEASURE_TYPE = ["end2end", "no_h2d"]
+MEASURE_TYPE = ["no_h2d", "end2end"]
 
 def run_exp(workload, gpu_util, precision, measure, device, batch_size, hidden_size, repeat, epoch, ti_dim, feat_dim, data_size, max_iters, config_name, interval, num_workers, local, csv_file):
     net = WORKLOADS[workload](
@@ -137,18 +137,23 @@ if __name__ == "__main__":
     parser.add_argument("--local_name", default=LOCAL_NAME, help="local data config xml, default is dirname(__file__)/config_local.xml")
     parser.add_argument("--local_mode", default=True, type=bool, help="fetch data locally instead of from rdma server")
     parser.add_argument("--logfile", help="path to logfile, default is (dirname(__file__)/__file__.log)")
-    parser.add_argument("--distributed", action="store_true", help="distnibuted mode, should execute this script by torchrun")
+    parser.add_argument("--distributed", action="store_true", help="distributed mode, should execute this script by torchrun")
     parser.add_argument("--print", default=True, type=bool, help="enable print the log")
     parser.add_argument("--csv_file", help="path to csv results, default is dirname(__file__)/result/<device_name>.csv")
     parser.add_argument("--measure", default="all", choices=[*MEASURE_TYPE, "all"], help="measure train time with h2d copy(end2end) or without h2d copy(no_h2d)")
     args = parser.parse_args()
+
+    if args.distributed:
+        torch.distributed.init_process_group(backend="nccl")
+        rank = torch.distributed.get_rank()
+        TimeEvaluator.set_distributed()
+    else:
+        rank = -1
     logpath = __file__[:__file__.rfind('.')] + datetime.datetime.now().strftime("_%Y%m%d_%H_%M_%S") + ".log" if args.logfile is None else args.logfile
-    logger = init_log(__name__, level=logging.INFO, logpath=logpath, enable_print=args.print)
+    logger = init_log(__name__, level=logging.INFO, logpath=logpath, enable_print=args.print, rank=rank)
     logger = get_logger()
     TimeEvaluator.set_log(logger)
     # Check params
-    if args.distributed:
-        torch.distributed.init_process_group(backend="nccl")
     check_device(args.device)
     logger.info(f"set device: {args.device}")
 
@@ -176,7 +181,11 @@ if __name__ == "__main__":
                 f"\nlocal_mode  : {args.local_mode}")
     # check data set
     if not check_dataset(args.local_name):
-        generate_random_dataset(args.local_name)
+        if not args.distributed or torch.distributed.get_rank() == 0:
+            generate_random_dataset(args.local_name)
+    if args.distributed:
+        torch.distributed.barrier()
+
     params_iters = list(itertools.product(params_workload, params_gpu_utils, params_precision, params_measure))
     for _workload, _gpu_uitls, _precision, _measure in params_iters:
         if args.device == "cpu" and _precision == "fp16":

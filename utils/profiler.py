@@ -13,6 +13,7 @@ class TimeEvaluator:
     df_buffer = None
     file_name = None
     logger = None
+    distributed = False
     test_index_records = {}
     class time_context:
         def __init__(self, measure_id, warmup=0):
@@ -35,7 +36,11 @@ class TimeEvaluator:
                 return
             self.time_usage = perf_counter() - self._time
             TimeEvaluator.add_test_time(self.measure_id, self.time_usage)
-        
+
+    @staticmethod
+    def set_distributed():
+        TimeEvaluator.distributed = True
+
     @staticmethod
     def add_test_time(measure_id, time_usage):
         if measure_id in TimeEvaluator.test_time_records:
@@ -119,7 +124,11 @@ class TimeEvaluator:
                     device_info = cpuinfo.get_cpu_info()["brand_raw"]
                 else:
                     device_info = torch.cuda.get_device_name(kwargs["device"].split(",")[0])
-                file_name = re.sub('[^a-zA-Z0-9]', '_', device_info) + "_private_train_benchmark.csv"
+                if TimeEvaluator.distributed:
+                    suffix = f"_private_train_benchmark.csv_{torch.distributed.get_rank()}.csv"
+                else:
+                    suffix = "_private_train_benchmark.csv"
+                file_name = re.sub('[^a-zA-Z0-9]', '_', device_info) + suffix
                 TimeEvaluator.file_name = os.path.join(os.path.dirname(os.path.dirname(__file__)), "result", file_name)
             else:
                 TimeEvaluator.file_name = kwargs["csv_file"]
