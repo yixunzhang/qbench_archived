@@ -1,4 +1,4 @@
-"""Compare speed of different models with batch size 12"""
+import torch.distributed as dist
 import torch
 import torch.optim as optim
 import torchvision.models as models
@@ -14,7 +14,10 @@ from torch.utils.data import Dataset, DataLoader
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+
 from apex import amp, optimizers
+from apex.parallel import DistributedDataParallel as DDP
+
 torch.backends.cudnn.benchmark = True
 # https://discuss.pytorch.org/t/what-does-torch-backends-cudnn-benchmark-do/5936
 # This flag allows you to enable the inbuilt cudnn auto-tuner to find the best algorithm to use for your hardware.
@@ -22,7 +25,6 @@ torch.backends.cudnn.benchmark = True
 
 
 MODEL_LIST = {
-    models.mnasnet: ['mnasnet1_0'], 
     models.resnet: ['resnet50', 'resnet101', 'resnext50_32x4d', 'resnext101_32x8d'],
     models.densenet: ['densenet121', 'densenet201'],
     models.squeezenet: ['squeezenet1_0'],
@@ -52,8 +54,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--NUM_DEVICES", "-d", type=int, default=1, required=False, help="Num of devices"
-)
+    "--local_rank", default=os.getenv('LOCAL_RANK', 0), type=int)
 
 parser.add_argument(
     "--folder",
@@ -65,7 +66,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-gpu_nums = [args.NUM_DEVICES]
+gpu_nums=[1]
 
 RESULT_FOLDER = f"{os.path.dirname(os.path.abspath(__file__))}/result"
 
@@ -82,26 +83,31 @@ class RandomDataset(Dataset):
 
 def train(precision, result, gpu_num, with_data_trans=False):
     rand_loader = DataLoader(
-        dataset=RandomDataset(args.BATCH_SIZE * gpu_num * (args.WARM_UP + args.NUM_TEST)),
-        batch_size=args.BATCH_SIZE * gpu_num,
+        dataset=RandomDataset(args.BATCH_SIZE * (args.WARM_UP + args.NUM_TEST)),
+        batch_size=args.BATCH_SIZE,
         shuffle=False,
         num_workers=8,
     )
     """use fake image for training speed test"""
-    target = torch.LongTensor(args.BATCH_SIZE * gpu_num).random_(args.NUM_CLASSES).cuda()
+    target = torch.LongTensor(args.BATCH_SIZE).random_(args.NUM_CLASSES).cuda()
     criterion = nn.CrossEntropyLoss()
     benchmark = {}
     for model_type in MODEL_LIST.keys():
         for model_name in MODEL_LIST[model_type]:
             model = getattr(model_type, model_name)(pretrained=False)
-            if gpu_num > 1:
-                model = nn.DataParallel(model, device_ids=range(gpu_num))
-            train_optimizer = optim.SGD(model.parameters(), lr=0.0001, weight_decay=1e-3)
             model = model.to("cuda")
+            if gpu_num > 1:
+                if precision == "half":
+                    model = DDP(model)
+                else:
+                    model = torch.nn.parallel.DistributedDataParallel(model)
+            train_optimizer = optim.SGD(model.parameters(), lr=0.0001, weight_decay=1e-3)
+
             if precision == "half":
                 model, train_optimizer = amp.initialize(model, train_optimizer,
                     opt_level="O3", keep_batchnorm_fp32=True,
                     loss_scale=128)
+
             durations = []
             print(f"Benchmarking Training {precision} precision type {model_name} on {gpu_num} gpu")
             for step, img in enumerate(rand_loader):
@@ -109,10 +115,14 @@ def train(precision, result, gpu_num, with_data_trans=False):
                 model.zero_grad()
                 if with_data_trans:
                     torch.cuda.synchronize()
+                    if gpu_num > 1:
+                        torch.distributed.barrier()
                     start = time.time()
                 img = img.to("cuda")
                 if not with_data_trans:
                     torch.cuda.synchronize()
+                    if gpu_num > 1:
+                        torch.distributed.barrier()
                     start = time.time()
                 prediction = model(img)
                 loss = criterion(prediction, target)
@@ -152,7 +162,7 @@ def analyze_result(path, path_with_trans):
         values[new_precision] = df_base[precision] / df_test[new_precision]
         boxes.append(np.concatenate([values.loc[values["type"]==model][new_precision].values for model in models]))
         labels.append(new_precision +"_end2end")
-    values_trans = df_test_trans 
+    values_trans = df_test_trans
     for precision in precisions:
         new_precision = precision if int(precision[0]) == gpu_nums[0] else f"{gpu_nums[0]}{precision[1:]}"
         values_trans[new_precision] = df_base_trans[precision] / df_test_trans[new_precision]
@@ -166,7 +176,7 @@ def analyze_result(path, path_with_trans):
     upper_quartile_vals = {k:v[0] for k, v in zip(labels, whiskers_vals)}
     lower_quartile_vals = {k:v[2] for k, v in zip(labels, whiskers_vals)}
     min_vals ={k:v[1] for k, v in zip(labels, whiskers_vals)}
-    max_vals = {k:v[3] for k, v in zip(labels, whiskers_vals)} 
+    max_vals = {k:v[3] for k, v in zip(labels, whiskers_vals)}
     summary={"min":min_vals,"upper_quartile": upper_quartile_vals, "median" : median_vals,"mean":mean_vals,"lower_quartile":lower_quartile_vals, "max" : max_vals}
     print(pd.DataFrame(summary))
     print("首行解释：在所跑的模型中，在精度{}．{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍".format(
@@ -174,49 +184,61 @@ def analyze_result(path, path_with_trans):
             median_vals[labels[0]], mean_vals[labels[0]], lower_quartile_vals[labels[0]], max_vals[labels[0]]))
     summary_path =path.split(".")[0] + "_summary.csv"
     pd.DataFrame(summary).to_csv(summary_path)
-    print(f"summary saved in {summary_path}") 
+    print(f"summary saved in {summary_path}")
 
 if __name__ == "__main__":
     folder_name = args.folder
+    args.distributed = False
+    if 'WORLD_SIZE' in os.environ:
+        args.distributed = int(os.environ['WORLD_SIZE']) > 1
+        gpu_nums[0] = int(os.environ['WORLD_SIZE'])
 
-    system_configs = f"{platform.uname()}\n\
-                     {psutil.cpu_freq()}\n\
-                    cpu_count: {psutil.cpu_count()}\n\
-                    memory_available: {psutil.virtual_memory().available}"
-    gpu_configs = [
-        torch.cuda.device_count(),
-        torch.version.cuda,
-        torch.backends.cudnn.version(),
-        torch.cuda.get_device_name(0),
-    ]
-    gpu_configs = list(map(str, gpu_configs))
-    temp = [
-        "Number of GPUs on current device : ",
-        "CUDA Version : ",
-        "Cudnn Version : ",
-        "Device Name : ",
-    ]
+    if args.distributed:
+        args.gpu = args.local_rank
+        torch.cuda.set_device(args.gpu)
+        torch.distributed.init_process_group(backend='nccl',
+                                             init_method='env://')
+        args.world_size = torch.distributed.get_world_size()
 
-    os.makedirs(folder_name, exist_ok=True)
-    with open(os.path.join(folder_name, "config.json"), "w") as f:
-        json.dump(vars(args), f, indent=2)
-    now = datetime.datetime.now()
+    if args.local_rank == 0:
+        system_configs = f"{platform.uname()}\n\
+                         {psutil.cpu_freq()}\n\
+                        cpu_count: {psutil.cpu_count()}\n\
+                        memory_available: {psutil.virtual_memory().available}"
+        gpu_configs = [
+            torch.cuda.device_count(),
+            torch.version.cuda,
+            torch.backends.cudnn.version(),
+            torch.cuda.get_device_name(0),
+        ]
+        gpu_configs = list(map(str, gpu_configs))
+        temp = [
+            "Number of GPUs on current device : ",
+            "CUDA Version : ",
+            "Cudnn Version : ",
+            "Device Name : ",
+        ]
 
-    start_time = now.strftime("%Y/%m/%d %H:%M:%S")
+        os.makedirs(folder_name, exist_ok=True)
+        with open(os.path.join(folder_name, "config.json"), "w") as f:
+            json.dump(vars(args), f, indent=2)
+        now = datetime.datetime.now()
 
-    print(f"benchmark start : {start_time}")
+        start_time = now.strftime("%Y/%m/%d %H:%M:%S")
 
-    for idx, value in enumerate(zip(temp, gpu_configs)):
-        gpu_configs[idx] = "".join(value)
-        print(gpu_configs[idx])
-    print(system_configs)
+        print(f"benchmark start : {start_time}")
 
-    with open(os.path.join(folder_name, "system_info.txt"), "w") as f:
-        f.writelines(f"benchmark start : {start_time}\n")
-        f.writelines("system_configs\n\n")
-        f.writelines(system_configs)
-        f.writelines("\ngpu_configs\n\n")
-        f.writelines(s + "\n" for s in gpu_configs)
+        for idx, value in enumerate(zip(temp, gpu_configs)):
+            gpu_configs[idx] = "".join(value)
+            print(gpu_configs[idx])
+        print(system_configs)
+
+        with open(os.path.join(folder_name, "system_info.txt"), "w") as f:
+            f.writelines(f"benchmark start : {start_time}\n")
+            f.writelines("system_configs\n\n")
+            f.writelines(system_configs)
+            f.writelines("\ngpu_configs\n\n")
+            f.writelines(s + "\n" for s in gpu_configs)
 
     train_result = {'type': []}
     for gpu_num in gpu_nums:
@@ -224,9 +246,10 @@ if __name__ == "__main__":
             train_result['type'].append(str(gpu_num)+precision)
             train(precision, train_result, gpu_num)
 
-    train_result_df = pd.DataFrame(train_result)
-    path = f"{folder_name}/{device_name}_public_train_benchmark.csv"
-    train_result_df.T.to_csv(path, index=True, header=False)
+    if args.local_rank == 0:
+        train_result_df = pd.DataFrame(train_result)
+        path = f"{folder_name}/{device_name}_public_train_benchmark.csv"
+        train_result_df.T.to_csv(path, index=True, header=False)
 
     train_result_with_trans = {'type': []}
     for gpu_num in gpu_nums:
@@ -234,14 +257,15 @@ if __name__ == "__main__":
             train_result_with_trans['type'].append(str(gpu_num)+precision)
             train(precision, train_result_with_trans, gpu_num, True)
 
-    train_result_with_trans_df = pd.DataFrame(train_result_with_trans)
-    path_with_trans = f"{folder_name}/{device_name}_public_train_benchmark_with_trans.csv"
-    train_result_with_trans_df.T.to_csv(path_with_trans, index=True, header=False)
+    if args.local_rank == 0:
+        train_result_with_trans_df = pd.DataFrame(train_result_with_trans)
+        path_with_trans = f"{folder_name}/{device_name}_public_train_benchmark_with_trans.csv"
+        train_result_with_trans_df.T.to_csv(path_with_trans, index=True, header=False)
 
-    now = datetime.datetime.now()
+        now = datetime.datetime.now()
 
-    end_time = now.strftime("%Y/%m/%d %H:%M:%S")
-    print(f"benchmark end : {end_time}")
-    with open(os.path.join(folder_name, "system_info.txt"), "a") as f:
-        f.writelines(f"benchmark end : {end_time}\n")
-    analyze_result(path, path_with_trans)
+        end_time = now.strftime("%Y/%m/%d %H:%M:%S")
+        print(f"benchmark end : {end_time}")
+        with open(os.path.join(folder_name, "system_info.txt"), "a") as f:
+            f.writelines(f"benchmark end : {end_time}\n")
+        analyze_result(path, path_with_trans)
