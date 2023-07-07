@@ -66,6 +66,8 @@ class DNN(Model):
                                 **kwargs)
         if gpu_util is not None:
             self.batch_size, self.hidden_size = DNN.GPU_UTILS_SETTINGS[gpu_util].values()
+        if self.distributed:
+            self.batch_size = self.batch_size * torch.distributed.get_world_size()
         # set hyper-parameters.
         self.optimizer = optimizer.lower()
         self.weight_decay = weight_decay

@@ -106,6 +106,8 @@ class ResNet50(Model):
         super(ResNet50, self).__init__(**kwargs)
         if gpu_util is not None:
             self.batch_size = ResNet50.gpu_utils[gpu_util]["batch_size"]
+        if self.distributed:
+            self.batch_size = self.batch_size * torch.distributed.get_world_size()
         self.set_iter()
         self.logger.info(
                 "ResNet50 parameters setting:"

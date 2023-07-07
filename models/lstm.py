@@ -57,6 +57,8 @@ class LSTM(Model):
         # set hyper-parameters.
         if gpu_util is not None:
             self.batch_size, self.hidden_size = LSTM.GPU_UTILS_SETTINGS[gpu_util].values()
+        if self.distributed:
+            self.batch_size = self.batch_size * torch.distributed.get_world_size()
         self.set_iter()
         self.logger.info(
             "LSTM parameters settingz"

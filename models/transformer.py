@@ -54,6 +54,8 @@ class Transformer(Model):
         self.reg = reg
         if gpu_util is not None:
             self.batch_size = Transformer.GPU_UTILS_SETTINGS[gpu_util]['batch_size']
+        if self.distributed:
+            self.batch_size = self.batch_size * torch.distributed.get_world_size()
         self.set_iter()
         self.logger.info("Transformer:"
                         f"\nd_feat : {self.d_feat}"
