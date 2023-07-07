@@ -76,7 +76,7 @@ def check_device(device):
             if not int(_d.split(":")[-1]) < device_count:
                 raise ValueError(f"Illegal devices {_d}")
 
-def analyze_result(path):
+def analyze_result(path, distributed):
     df_test=pd.read_csv(path)
     df_base = pd.read_csv(f"{os.path.dirname(os.path.abspath(__file__))}/result/baseline_private.csv")
     models=set(df_base["workload"])
@@ -111,7 +111,10 @@ def analyze_result(path):
     print("首行解释：在所跑的模型中，在精度{}，{}数据(end2end包含了数据拷贝时间，no_h2d表示不包含数据拷贝时间)，最小加速为{:.4f}倍，75％了至少{:.4f}倍加速，50％获取了至少{:.4f}倍加速，平均获得{:.4f}倍加速，25％获取了至少{:.4f}倍加速，最大加速值为{:.4f}倍".format(
             labels[0].split("-")[0], labels[0].split("-")[1], min_vals[labels[0]], upper_quartile_vals[labels[0]],
             median_vals[labels[0]], mean_vals[labels[0]],lower_quartile_vals[labels[0]], max_vals[labels[0]]))
-    summary_path = path.split(".")[0] + "_summary.csv"
+    if distributed:
+        summary_path = path.split(".")[0] + f"_rank{torch.distributed.get_rank()}_summary.csv"
+    else:
+        summary_path = path.split(".")[0] + f"_summary.csv"
     pd.DataFrame(summary).to_csv(summary_path) 
     print(f"summary saved in {summary_path}") 
 
@@ -212,4 +215,4 @@ if __name__ == "__main__":
                     local = args.local_mode,
                     csv_file = args.csv_file
                     )
-    analyze_result(TimeEvaluator.file_name)
+    analyze_result(TimeEvaluator.file_name, args.distributed)

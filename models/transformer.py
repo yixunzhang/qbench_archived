@@ -127,6 +127,8 @@ class Transformer(Model):
                     self.test_epoch(batch_x, batch_y)
                     if self.use_gpu:
                         torch.cuda.synchronize()
+                    if self.distributed:
+                        torch.distributed.barrier()
             if not self.check_iter():
                 break
         if self.use_gpu:

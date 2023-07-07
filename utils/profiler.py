@@ -125,7 +125,7 @@ class TimeEvaluator:
                 else:
                     device_info = torch.cuda.get_device_name(kwargs["device"].split(",")[0])
                 if TimeEvaluator.distributed:
-                    suffix = f"_private_train_benchmark.csv_{torch.distributed.get_rank()}.csv"
+                    suffix = f"_private_train_benchmark_{torch.distributed.get_rank()}.csv"
                 else:
                     suffix = "_private_train_benchmark.csv"
                 file_name = re.sub('[^a-zA-Z0-9]', '_', device_info) + suffix
