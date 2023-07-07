@@ -14,7 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-
+from apex import amp, optimizers
 torch.backends.cudnn.benchmark = True
 # https://discuss.pytorch.org/t/what-does-torch-backends-cudnn-benchmark-do/5936
 # This flag allows you to enable the inbuilt cudnn auto-tuner to find the best algorithm to use for your hardware.
@@ -96,9 +96,12 @@ def train(precision, result, gpu_num, with_data_trans=False):
             model = getattr(model_type, model_name)(pretrained=False)
             if gpu_num > 1:
                 model = nn.DataParallel(model, device_ids=range(gpu_num))
-            model = getattr(model, precision)()
             train_optimizer = optim.SGD(model.parameters(), lr=0.0001, weight_decay=1e-3)
             model = model.to("cuda")
+            if precision == "half":
+                model, train_optimizer = amp.initialize(model, train_optimizer,
+                    opt_level="O3", keep_batchnorm_fp32=True,
+                    loss_scale=128)
             durations = []
             print(f"Benchmarking Training {precision} precision type {model_name} on {gpu_num} gpu")
             for step, img in enumerate(rand_loader):
@@ -113,7 +116,11 @@ def train(precision, result, gpu_num, with_data_trans=False):
                     start = time.time()
                 prediction = model(img)
                 loss = criterion(prediction, target)
-                loss.backward()
+                if precision == "half":
+                    with amp.scale_loss(loss, train_optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
                 train_optimizer.step()
                 torch.cuda.synchronize()
                 end = time.time()
